@@ -9,12 +9,14 @@ const TRACK_COLORS: Record<MortgageTrack['type'], string> = {
   prime: 'text-accent-blue border-accent-blue/30 bg-accent-blue/5',
   fixed: 'text-accent-green border-accent-green/30 bg-accent-green/5',
   'cpi-linked': 'text-accent-red border-accent-red/30 bg-accent-red/5',
+  'equal-principal': 'text-gold border-gold/30 bg-gold/5',
 };
 
 const TRACK_LABEL_COLORS: Record<MortgageTrack['type'], string> = {
   prime: 'text-accent-blue',
   fixed: 'text-accent-green',
   'cpi-linked': 'text-accent-red',
+  'equal-principal': 'text-gold',
 };
 
 function formatNumber(n: number): string {
@@ -112,7 +114,7 @@ export default function MortgagePanel() {
       {/* Add track buttons */}
       <div className="space-y-2">
         <p className="text-text-muted text-xs font-assistant">{t('mortgage.addTrack')}:</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <TrackButton
             label={t('mortgage.prime')}
             color="text-accent-blue"
@@ -127,6 +129,11 @@ export default function MortgagePanel() {
             label={t('mortgage.cpiLinked')}
             color="text-accent-red"
             onClick={() => addMortgageTrack('cpi-linked')}
+          />
+          <TrackButton
+            label="קרן שווה"
+            color="text-gold"
+            onClick={() => addMortgageTrack('equal-principal')}
           />
         </div>
       </div>
@@ -172,7 +179,9 @@ function TrackCard({ track, boiRate, onUpdate, onRemove }: TrackCardProps) {
       ? t('mortgage.prime')
       : track.type === 'fixed'
         ? t('mortgage.fixed')
-        : t('mortgage.cpiLinked');
+        : track.type === 'equal-principal'
+          ? 'קרן שווה'
+          : t('mortgage.cpiLinked');
 
   return (
     <motion.div

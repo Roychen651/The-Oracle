@@ -23,6 +23,12 @@ export default {
       fontFamily: {
         assistant: ['Assistant', 'sans-serif'],
         montserrat: ['Montserrat', 'sans-serif'],
+        'space-grotesk': ['Space Grotesk', 'sans-serif'],
+      },
+      boxShadow: {
+        'gold': '0 0 20px rgba(200, 169, 81, 0.3)',
+        'gold-lg': '0 0 40px rgba(200, 169, 81, 0.4)',
+        'inner-gold': 'inset 0 1px 0 rgba(200, 169, 81, 0.2)',
       },
       animation: {
         'slide-in': 'slideIn 0.3s ease-out',

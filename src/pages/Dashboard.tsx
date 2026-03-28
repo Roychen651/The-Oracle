@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, Sparkles, Shield, BarChart3 } from 'lucide-react';
+import { Eye, Sparkles, Shield, BarChart3, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSimulationStore } from '../stores/useSimulationStore';
+import { useAuthStore } from '../stores/useAuthStore';
+import { saveSimulationState } from '../lib/supabase';
 import StatsCard from '../components/ui/StatsCard';
 import MainGraph from '../components/charts/MainGraph';
 import BreakdownPie from '../components/charts/BreakdownPie';
@@ -17,10 +19,16 @@ const containerVariants = {
   },
 };
 
-export default function Dashboard() {
+interface DashboardProps {
+  onShowAuth?: () => void;
+}
+
+export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
   const { t } = useTranslation();
-  const { params, results, recalculate, selectedYear, setSelectedYear } =
-    useSimulationStore();
+  const { params, results, recalculate, selectedYear, setSelectedYear } = useSimulationStore();
+  const { user } = useAuthStore();
+  const [saving, setSaving] = useState(false);
+  const [savedFeedback, setSavedFeedback] = useState(false);
 
   // Run initial calculation on mount
   useEffect(() => {
@@ -36,12 +44,19 @@ export default function Dashboard() {
   const finalData = yearlyData[yearlyData.length - 1];
   const firstYearData = yearlyData[0];
 
+  const handleSaveCloud = async () => {
+    if (!user) return;
+    setSaving(true);
+    await saveSimulationState(user.id, params);
+    setSaving(false);
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2000);
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* Hero / Empty state */}
-      {!hasConfig && (
-        <HeroSection />
-      )}
+      {!hasConfig && <HeroSection />}
 
       {/* Stats Row */}
       {results && (
@@ -105,6 +120,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="bg-surface border border-border-custom rounded-2xl p-5"
+          data-tour="chart"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-text-primary font-assistant font-bold text-base">
@@ -160,6 +176,11 @@ export default function Dashboard() {
                 value={`₪${formatNumber(results.totalInterestPaid)}`}
                 valueColor="text-accent-red"
               />
+              <SummaryRow
+                label="סך מס רווחי הון"
+                value={`₪${formatNumber(results.totalCapitalGainsTaxPaid)}`}
+                valueColor="text-accent-red"
+              />
               {results.debtFreeYear && (
                 <SummaryRow
                   label="חופשי מחוב בשנת"
@@ -183,7 +204,17 @@ export default function Dashboard() {
                 <div className="mt-2">
                   <SummaryRow
                     label="עומס על ההכנסה"
-                    value={`${params.monthlyIncome > 0 ? (((results.monthlyBreakdown.mortgage + results.monthlyBreakdown.car + results.monthlyBreakdown.expenses) / params.monthlyIncome) * 100).toFixed(0) : 0}%`}
+                    value={`${
+                      params.monthlyIncome > 0
+                        ? (
+                            ((results.monthlyBreakdown.mortgage +
+                              results.monthlyBreakdown.car +
+                              results.monthlyBreakdown.expenses) /
+                              params.monthlyIncome) *
+                            100
+                          ).toFixed(0)
+                        : 0
+                    }%`}
                     valueColor="text-text-secondary"
                   />
                 </div>
@@ -191,6 +222,22 @@ export default function Dashboard() {
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Floating Save button for authenticated users */}
+      {user && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          onClick={handleSaveCloud}
+          disabled={saving}
+          className="fixed bottom-24 right-6 flex items-center gap-2 px-4 py-3 rounded-2xl font-assistant font-semibold text-sm shadow-gold transition-all disabled:opacity-60 z-30"
+          style={{ background: savedFeedback ? 'var(--accent-green)' : 'var(--gold)', color: 'var(--bg)' }}
+          aria-label="שמור תרחיש"
+        >
+          <Save size={16} />
+          {saving ? 'שומר...' : savedFeedback ? 'נשמר!' : 'שמור תרחיש'}
+        </motion.button>
       )}
     </div>
   );
@@ -217,7 +264,7 @@ function SummaryRow({
   return (
     <div className="flex justify-between items-center py-1">
       <span className="text-text-secondary text-sm font-assistant">{label}</span>
-      <span className={`font-montserrat font-bold text-sm ${valueColor}`}>{value}</span>
+      <span className={`font-numbers font-bold text-sm ${valueColor}`}>{value}</span>
     </div>
   );
 }
@@ -243,8 +290,7 @@ function HeroSection() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background:
-            'radial-gradient(ellipse at 50% -20%, var(--gold-glow) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% -20%, var(--gold-glow) 0%, transparent 60%)',
         }}
       />
 

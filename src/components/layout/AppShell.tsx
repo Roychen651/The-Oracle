@@ -7,9 +7,10 @@ import AccessibilityMenu from '../ui/AccessibilityMenu';
 
 interface AppShellProps {
   children: ReactNode;
+  onShowAuth?: () => void;
 }
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ children, onShowAuth }: AppShellProps) {
   const { fontSize, reducedMotion, readableFont, highContrast } = useUIStore();
 
   useEffect(() => {
@@ -27,11 +28,11 @@ export default function AppShell({ children }: AppShellProps) {
       style={{ paddingBottom: '40px' }}
     >
       {/* Top Navigation */}
-      <Navigation />
+      <Navigation onShowAuth={onShowAuth} />
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar (right in RTL = rendered last in DOM but visually right) */}
+        {/* Sidebar (right in RTL) */}
         <div className="hidden md:block">
           <Sidebar />
         </div>

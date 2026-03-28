@@ -2,7 +2,7 @@
 
 export interface MortgageTrack {
   id: string;
-  type: 'prime' | 'fixed' | 'cpi-linked';
+  type: 'prime' | 'fixed' | 'cpi-linked' | 'equal-principal';
   principal: number;
   rate: number; // annual rate %
   months: number;
@@ -51,6 +51,7 @@ export interface SimulationParams {
   inflation: number; // annual % e.g. 3.5
   investmentReturn: number; // annual % on savings e.g. 7
   years: number; // 10-40
+  capitalGainsTax: number; // 0-1, default 0.25
 }
 
 export interface YearlyDataPoint {
@@ -63,6 +64,7 @@ export interface YearlyDataPoint {
   monthlyCarPayment: number;
   totalMonthlyIncome: number;
   totalMonthlyExpenses: number;
+  netAfterTaxNetWorth: number;
 }
 
 export interface SimulationResult {
@@ -71,6 +73,7 @@ export interface SimulationResult {
   debtFreeYear: number | null;
   breakEvenYear: number | null;
   finalNetWorth: number;
+  totalCapitalGainsTaxPaid: number;
   monthlyBreakdown: {
     mortgage: number;
     car: number;
@@ -93,6 +96,27 @@ export function spitzerMonthlyPayment(
   if (r === 0) return principal / months;
   const factor = Math.pow(1 + r, months);
   return (principal * r * factor) / (factor - 1);
+}
+
+/**
+ * Equal Principal (קרן שווה) schedule:
+ * Monthly principal payment is FIXED = principal / months
+ * Monthly interest = remainingBalance * monthlyRate
+ * Total monthly payment DECREASES over time (higher at start, lower at end)
+ */
+function calculateEqualPrincipalSchedule(track: MortgageTrack): number[] {
+  const monthlyPrincipal = track.principal / track.months;
+  const monthlyRate = track.rate / 100 / 12;
+  const payments: number[] = [];
+  let balance = track.principal;
+
+  for (let m = 1; m <= track.months; m++) {
+    const interest = balance * monthlyRate;
+    const totalPayment = monthlyPrincipal + interest;
+    payments.push(totalPayment);
+    balance -= monthlyPrincipal;
+  }
+  return payments;
 }
 
 /**
@@ -156,6 +180,10 @@ export function calculateMortgageSchedule(
       return payments;
     }
 
+    case 'equal-principal': {
+      return calculateEqualPrincipalSchedule(track);
+    }
+
     default:
       return new Array(track.months).fill(0);
   }
@@ -194,6 +222,7 @@ export function calculateCarSchedule(carLoan: CarLoan): number[] {
  */
 export function runSimulation(params: SimulationParams): SimulationResult {
   const totalMonths = params.years * 12;
+  const capitalGainsTax = params.capitalGainsTax ?? 0.25;
 
   // Pre-calculate all mortgage schedules
   const mortgageSchedules = params.mortgageTracks.map((track) =>
@@ -219,6 +248,7 @@ export function runSimulation(params: SimulationParams): SimulationResult {
 
   const yearlyData: YearlyDataPoint[] = [];
   let totalInterestPaid = 0;
+  let totalCapitalGainsTaxPaid = 0;
   let debtFreeYear: number | null = null;
   let breakEvenYear: number | null = null;
 
@@ -270,12 +300,21 @@ export function runSimulation(params: SimulationParams): SimulationResult {
         const payment = schedule[monthIdx];
         totalMortgagePayment += payment;
 
-        // Update mortgage balance (approximate by reducing by principal portion)
+        // Update mortgage balance
         const track = params.mortgageTracks[t];
-        const effectiveRate =
-          track.type === 'prime'
-            ? (params.boiRate + (track.margin ?? 1.5)) / 100 / 12
-            : track.rate / 100 / 12;
+        let effectiveRate: number;
+        if (track.type === 'prime') {
+          effectiveRate = (params.boiRate + (track.margin ?? 1.5)) / 100 / 12;
+        } else if (track.type === 'equal-principal') {
+          effectiveRate = track.rate / 100 / 12;
+          const principalPortion = track.principal / track.months;
+          const interestPortion = mortgageBalances[t] * effectiveRate;
+          totalInterestPaid += interestPortion;
+          mortgageBalances[t] = Math.max(0, mortgageBalances[t] - principalPortion);
+          continue;
+        } else {
+          effectiveRate = track.rate / 100 / 12;
+        }
         const interestPortion = mortgageBalances[t] * effectiveRate;
         const principalPortion = Math.max(0, payment - interestPortion);
         totalInterestPaid += interestPortion;
@@ -288,7 +327,6 @@ export function runSimulation(params: SimulationParams): SimulationResult {
     const carMonthIdx = month - 1;
     if (carSchedule.length > 0 && carMonthIdx < carSchedule.length) {
       monthlyCarPayment = carSchedule[carMonthIdx];
-      // Update car balance
       const carRate = params.carLoan ? params.carLoan.rate / 100 / 12 : 0;
       const carInterest = carBalance * carRate;
       const carPrincipal = Math.max(0, monthlyCarPayment - carInterest);
@@ -301,15 +339,15 @@ export function runSimulation(params: SimulationParams): SimulationResult {
     const cashFlow = monthlyIncome - totalPayments;
 
     // Invest surplus or draw from assets if deficit
-    if (cashFlow > 0) {
-      assets += cashFlow;
-    } else {
-      assets += cashFlow; // can go negative (debt)
-    }
+    assets += cashFlow;
 
-    // Apply investment return to positive assets
+    // Apply investment return to positive assets, net of capital gains tax
     if (assets > 0) {
-      assets *= 1 + monthlyInvestmentReturn;
+      const grossReturn = assets * monthlyInvestmentReturn;
+      const taxableGain = grossReturn * capitalGainsTax;
+      const netReturn = grossReturn - taxableGain;
+      totalCapitalGainsTaxPaid += taxableGain;
+      assets += netReturn;
     }
 
     // Record yearly snapshot at end of each year
@@ -317,6 +355,7 @@ export function runSimulation(params: SimulationParams): SimulationResult {
       const totalMortgageDebt = mortgageBalances.reduce((sum, b) => sum + b, 0);
       const totalDebt = totalMortgageDebt + Math.max(0, carBalance);
       const netWorth = assets - totalDebt;
+      const netAfterTaxNetWorth = netWorth; // already net of taxes applied monthly
 
       // Check debt-free year
       if (debtFreeYear === null && totalDebt < 1000) {
@@ -364,6 +403,7 @@ export function runSimulation(params: SimulationParams): SimulationResult {
         monthlyCarPayment: avgCarPayment,
         totalMonthlyIncome: monthlyIncome,
         totalMonthlyExpenses: monthlyExpenses,
+        netAfterTaxNetWorth,
       });
     }
   }
@@ -388,6 +428,7 @@ export function runSimulation(params: SimulationParams): SimulationResult {
     debtFreeYear,
     breakEvenYear,
     finalNetWorth,
+    totalCapitalGainsTaxPaid,
     monthlyBreakdown: {
       mortgage: firstYearData?.monthlyMortgagePayment ?? 0,
       car: firstYearData?.monthlyCarPayment ?? 0,

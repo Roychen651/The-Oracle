@@ -8,6 +8,7 @@ import type {
   LifeEvent,
 } from '../lib/finance-engine';
 import { runSimulation } from '../lib/finance-engine';
+import { saveSimulationState } from '../lib/supabase';
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -24,6 +25,7 @@ const defaultParams: SimulationParams = {
   inflation: 3.5,
   investmentReturn: 7,
   years: 30,
+  capitalGainsTax: 0.25,
 };
 
 interface SimulationStore {
@@ -46,6 +48,7 @@ interface SimulationStore {
     inflation?: number;
     investmentReturn?: number;
   }) => void;
+  updateCapitalGainsTax: (rate: number) => void;
   setSimulationYears: (years: number) => void;
   recalculate: () => void;
   setSelectedYear: (year: number) => void;
@@ -54,6 +57,24 @@ interface SimulationStore {
 
 function calculate(params: SimulationParams): SimulationResult {
   return runSimulation(params);
+}
+
+// Debounce timer for Supabase sync
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function debouncedSyncToSupabase(params: SimulationParams) {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const { useAuthStore } = await import('./useAuthStore');
+      const { user } = useAuthStore.getState();
+      if (user) {
+        await saveSimulationState(user.id, params);
+      }
+    } catch {
+      // Silently fail — Supabase may not be configured
+    }
+  }, 1500);
 }
 
 export const useSimulationStore = create<SimulationStore>()(
@@ -67,16 +88,19 @@ export const useSimulationStore = create<SimulationStore>()(
       setMonthlyIncome: (v) => {
         const params = { ...get().params, monthlyIncome: v };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       setMonthlyExpenses: (v) => {
         const params = { ...get().params, monthlyExpenses: v };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       setCurrentAssets: (v) => {
         const params = { ...get().params, currentAssets: v };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       addMortgageTrack: (type) => {
@@ -84,6 +108,14 @@ export const useSimulationStore = create<SimulationStore>()(
           prime: { rate: 4.5, margin: 1.5, months: 240, principal: 500000 },
           fixed: { rate: 5.5, months: 240, principal: 500000 },
           'cpi-linked': { rate: 3.0, months: 240, principal: 500000 },
+          'equal-principal': { rate: 4.0, months: 240, principal: 500000 },
+        };
+
+        const labelMap: Record<MortgageTrack['type'], string> = {
+          prime: 'פריים',
+          fixed: 'קבועה לא צמודה',
+          'cpi-linked': 'צמודת מדד',
+          'equal-principal': 'קרן שווה',
         };
 
         const newTrack: MortgageTrack = {
@@ -93,12 +125,7 @@ export const useSimulationStore = create<SimulationStore>()(
           rate: 4.5,
           months: 240,
           ...defaults[type],
-          label:
-            type === 'prime'
-              ? 'פריים'
-              : type === 'fixed'
-                ? 'קבועה לא צמודה'
-                : 'צמודת מדד',
+          label: labelMap[type],
         };
 
         const params = {
@@ -106,6 +133,7 @@ export const useSimulationStore = create<SimulationStore>()(
           mortgageTracks: [...get().params.mortgageTracks, newTrack],
         };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       updateMortgageTrack: (id, updates) => {
@@ -114,17 +142,20 @@ export const useSimulationStore = create<SimulationStore>()(
         );
         const params = { ...get().params, mortgageTracks: tracks };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       removeMortgageTrack: (id) => {
         const tracks = get().params.mortgageTracks.filter((t) => t.id !== id);
         const params = { ...get().params, mortgageTracks: tracks };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       setCarLoan: (loan) => {
         const params = { ...get().params, carLoan: loan };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       addLifeEvent: (event) => {
@@ -134,36 +165,54 @@ export const useSimulationStore = create<SimulationStore>()(
           events: [...get().params.events, newEvent],
         };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       removeLifeEvent: (id) => {
         const events = get().params.events.filter((e) => e.id !== id);
         const params = { ...get().params, events };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       updateEconomics: (updates) => {
         const params = { ...get().params, ...updates };
         set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
+      },
+
+      updateCapitalGainsTax: (rate) => {
+        const params = { ...get().params, capitalGainsTax: rate };
+        set({ params, results: calculate(params) });
+        debouncedSyncToSupabase(params);
       },
 
       setSimulationYears: (years) => {
         const params = { ...get().params, years };
         set({ params, results: calculate(params), selectedYear: 1 });
+        debouncedSyncToSupabase(params);
       },
 
       recalculate: () => {
         set({ isCalculating: true });
-        const results = calculate(get().params);
+        const currentParams = get().params;
+        const results = calculate(currentParams);
         set({ results, isCalculating: false });
+        debouncedSyncToSupabase(currentParams);
       },
 
       setSelectedYear: (year) => {
         set({ selectedYear: year });
       },
 
-      loadParams: (params) => {
-        set({ params, results: calculate(params) });
+      loadParams: (incoming) => {
+        // Ensure capitalGainsTax exists in loaded params
+        const merged: SimulationParams = {
+          ...defaultParams,
+          ...incoming,
+          capitalGainsTax: incoming.capitalGainsTax ?? 0.25,
+        };
+        set({ params: merged, results: calculate(merged) });
       },
     }),
     {
@@ -172,3 +221,5 @@ export const useSimulationStore = create<SimulationStore>()(
     }
   )
 );
+
+export const useSimulationResults = () => useSimulationStore((s) => s.results);

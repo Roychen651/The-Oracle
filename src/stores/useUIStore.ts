@@ -9,6 +9,8 @@ interface UIStore {
   reducedMotion: boolean;
   readableFont: boolean;
   sidebarOpen: boolean;
+  onboardingComplete: boolean;
+  onboardingStep: number; // 0-5, -1 = not started
 
   toggleTheme: () => void;
   setLanguage: (lang: 'he' | 'en') => void;
@@ -19,6 +21,10 @@ interface UIStore {
   toggleReadableFont: () => void;
   toggleSidebar: () => void;
   resetAccessibility: () => void;
+  startOnboarding: () => void;
+  nextOnboardingStep: () => void;
+  skipOnboarding: () => void;
+  resetOnboarding: () => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -31,6 +37,8 @@ export const useUIStore = create<UIStore>()(
       reducedMotion: false,
       readableFont: false,
       sidebarOpen: true,
+      onboardingComplete: false,
+      onboardingStep: -1,
 
       toggleTheme: () => {
         set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' }));
@@ -73,6 +81,27 @@ export const useUIStore = create<UIStore>()(
           reducedMotion: false,
           readableFont: false,
         });
+      },
+
+      startOnboarding: () => {
+        set({ onboardingStep: 0 });
+      },
+
+      nextOnboardingStep: () => {
+        const current = get().onboardingStep;
+        if (current >= 5) {
+          set({ onboardingComplete: true, onboardingStep: -1 });
+        } else {
+          set({ onboardingStep: current + 1 });
+        }
+      },
+
+      skipOnboarding: () => {
+        set({ onboardingComplete: true, onboardingStep: -1 });
+      },
+
+      resetOnboarding: () => {
+        set({ onboardingComplete: false, onboardingStep: -1 });
       },
     }),
     {
