@@ -218,8 +218,8 @@ export default function Navigation({ onShowAuth }: NavigationProps) {
 
   const handleSignOut = async () => {
     await signOut()
-    // Navigate to auth page after logout
-    onShowAuth?.()
+    // Return to dashboard as guest — user can click "התחבר" if they want to sign back in
+    navigateTo('dashboard')
   }
 
   const avatarUrl = getAvatarUrl()

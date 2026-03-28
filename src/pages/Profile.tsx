@@ -211,7 +211,7 @@ export default function Profile({ onShowAuth }: ProfileProps) {
 
   const handleSignOut = async () => {
     await signOut()
-    onShowAuth?.()
+    navigateTo('dashboard')
   }
 
   // Not logged in state

@@ -5,8 +5,6 @@ import Sidebar from './Sidebar'
 import BottomSheet from '../ui/BottomSheet'
 import LegalDisclaimer from '../ui/LegalDisclaimer'
 import AccessibilityMenu from '../ui/AccessibilityMenu'
-import OnboardingTour from '../ui/OnboardingTour'
-
 interface AppShellProps {
   children: ReactNode
   onShowAuth?: () => void
@@ -90,7 +88,6 @@ export default function AppShell({ children, onShowAuth }: AppShellProps) {
       </div>
 
       <AccessibilityMenu />
-      <OnboardingTour />
       <LegalDisclaimer />
     </div>
   )
