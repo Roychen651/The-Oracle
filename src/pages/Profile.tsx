@@ -209,8 +209,8 @@ export default function Profile({ onShowAuth }: ProfileProps) {
     setScenarios((prev) => prev.filter((s) => s.id !== id))
   }
 
-  const handleSignOut = async () => {
-    await signOut()
+  const handleSignOut = () => {
+    signOut()
     navigateTo('dashboard')
   }
 

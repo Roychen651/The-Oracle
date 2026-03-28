@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { User, Session } from '@supabase/supabase-js'
 import {
   supabase,
-  signOut as supabaseSignOut,
   fetchSimulationState,
   fetchProfile,
   upsertProfile,
@@ -21,8 +20,8 @@ interface AuthStore {
   // Called once from App.tsx on mount. Returns cleanup fn.
   initialize: () => (() => void)
 
-  // Signs out, clears all state. Caller can optionally navigate.
-  signOut: () => Promise<void>
+  // Clears local state immediately, invalidates session in background.
+  signOut: () => void
 
   loadProfile: (userId: string) => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>
@@ -111,23 +110,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return () => subscription.unsubscribe()
   },
 
-  signOut: async () => {
-    // Tear down realtime subscription synchronously
+  signOut: () => {
+    // Clear local state FIRST — instant UI response, never blocked by network
     get().realtimeUnsubscribe?.()
+    set({ user: null, session: null, profile: null, realtimeUnsubscribe: null, loading: false })
 
-    try {
-      await supabaseSignOut()
-    } catch (err) {
-      console.warn('[AuthStore] signOut error:', err)
+    // Fire server-side invalidation in background (best-effort, don't await)
+    if (supabase) {
+      supabase.auth.signOut().catch(() => {})
     }
-
-    // Clear state regardless of whether the network call succeeded
-    set({
-      user: null,
-      session: null,
-      profile: null,
-      realtimeUnsubscribe: null,
-    })
   },
 
   loadProfile: async (userId: string) => {

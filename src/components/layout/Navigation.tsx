@@ -216,9 +216,8 @@ export default function Navigation({ onShowAuth }: NavigationProps) {
     if (!result) throw new Error('Save failed')
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    // Return to dashboard as guest — user can click "התחבר" if they want to sign back in
+  const handleSignOut = () => {
+    signOut()
     navigateTo('dashboard')
   }
 
