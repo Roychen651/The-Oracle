@@ -72,7 +72,8 @@ export default function OnboardingTour() {
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null)
 
   const currentStep = STEPS[onboardingStep] ?? null
-  const isVisible = onboardingStep >= 0 && !onboardingComplete
+  // Step 0 is handled by WelcomeOverlay — only show for steps 1+
+  const isVisible = onboardingStep >= 1 && !onboardingComplete
 
   const measureTarget = useCallback(() => {
     if (!currentStep?.targetSelector) {

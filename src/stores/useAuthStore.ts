@@ -18,11 +18,16 @@ interface AuthStore {
   profile: UserProfile | null
   realtimeUnsubscribe: (() => void) | null
 
+  // Called once from App.tsx on mount. Returns cleanup fn.
   initialize: () => (() => void)
+
+  // Signs out, clears all state. Caller can optionally navigate.
   signOut: () => Promise<void>
+
   loadProfile: (userId: string) => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>
   getAvatarUrl: () => string | null
+  getDisplayName: () => string
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -34,12 +39,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   realtimeUnsubscribe: null,
 
   initialize: () => {
+    // No Supabase — mark ready immediately and return no-op cleanup
     if (!supabase) {
       set({ loading: false, initialized: true })
       return () => {}
     }
 
-    supabase.auth.getSession().then(({ data }) => {
+    // Restore existing session on startup
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.warn('[AuthStore] getSession error:', error.message)
+      }
       set({
         session: data.session,
         user: data.session?.user ?? null,
@@ -51,58 +61,101 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      set({ session, user: session?.user ?? null, loading: false })
+      set({ session, user: session?.user ?? null })
+
       if (event === 'SIGNED_IN' && session?.user) {
         const userId = session.user.id
 
-        // Load simulation state
-        const { useSimulationStore } = await import('./useSimulationStore')
-        const state = await fetchSimulationState(userId)
-        if (state) useSimulationStore.getState().loadParams(state)
+        // Load simulation state from Supabase and merge into local store
+        try {
+          const { useSimulationStore } = await import('./useSimulationStore')
+          const state = await fetchSimulationState(userId)
+          if (state) useSimulationStore.getState().loadParams(state)
+        } catch {
+          // Non-fatal — local state is the source of truth
+        }
 
-        // Load profile
+        // Load or auto-create profile
         await get().loadProfile(userId)
 
-        // Set up realtime subscription
-        const unsub = subscribeToSimulation(userId, (params) => {
-          import('./useSimulationStore').then(({ useSimulationStore: sim }) => {
-            sim.getState().loadParams(params)
-          })
+        // Subscribe to real-time simulation updates from other devices
+        const unsub = subscribeToSimulation(userId, async (params) => {
+          const { useSimulationStore: sim } = await import('./useSimulationStore')
+          sim.getState().loadParams(params)
         })
         set({ realtimeUnsubscribe: unsub })
       }
 
+      if (event === 'PASSWORD_RECOVERY') {
+        // User arrived via a password-reset link.
+        // The access token is now in the session; mark initialized so
+        // App.tsx can detect the ?reset=true URL param and show the reset view.
+        set({ loading: false, initialized: true })
+      }
+
       if (event === 'SIGNED_OUT') {
         get().realtimeUnsubscribe?.()
-        set({ profile: null, realtimeUnsubscribe: null })
+        set({
+          user: null,
+          session: null,
+          profile: null,
+          realtimeUnsubscribe: null,
+          loading: false,
+        })
       }
+
+      // Always mark initialized after the first auth event
+      set((s) => (s.initialized ? s : { initialized: true, loading: false }))
     })
 
     return () => subscription.unsubscribe()
   },
 
   signOut: async () => {
+    // Tear down realtime subscription synchronously
     get().realtimeUnsubscribe?.()
-    await supabaseSignOut()
-    set({ user: null, session: null, profile: null, realtimeUnsubscribe: null })
+
+    try {
+      await supabaseSignOut()
+    } catch (err) {
+      console.warn('[AuthStore] signOut error:', err)
+    }
+
+    // Clear state regardless of whether the network call succeeded
+    set({
+      user: null,
+      session: null,
+      profile: null,
+      realtimeUnsubscribe: null,
+    })
   },
 
   loadProfile: async (userId: string) => {
     let profile = await fetchProfile(userId)
+
     if (!profile) {
-      // Create a default profile from Google metadata
+      // First sign-in: create a profile seeded from OAuth metadata
       const { user } = get()
-      const googleName = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? null
-      const googleAvatar = user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture ?? null
+      const displayName =
+        user?.user_metadata?.full_name ??
+        user?.user_metadata?.name ??
+        user?.email?.split('@')[0] ??
+        null
+      const avatarUrl =
+        user?.user_metadata?.avatar_url ??
+        user?.user_metadata?.picture ??
+        null
+
       profile = await upsertProfile(userId, {
         user_id: userId,
-        display_name: googleName,
-        avatar_url: googleAvatar,
-        avatar_type: googleAvatar ? 'google' : 'preset',
+        display_name: displayName,
+        avatar_url: avatarUrl,
+        avatar_type: avatarUrl ? 'google' : 'preset',
         avatar_preset_id: null,
       })
     }
-    set({ profile })
+
+    if (profile) set({ profile })
   },
 
   updateProfile: async (updates: Partial<UserProfile>) => {
@@ -121,6 +174,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       user?.user_metadata?.avatar_url ??
       user?.user_metadata?.picture ??
       null
+    )
+  },
+
+  getDisplayName: () => {
+    const { profile, user } = get()
+    return (
+      profile?.display_name ??
+      user?.user_metadata?.full_name ??
+      user?.user_metadata?.name ??
+      user?.email?.split('@')[0] ??
+      'משתמש'
     )
   },
 }))

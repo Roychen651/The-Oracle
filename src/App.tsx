@@ -5,7 +5,9 @@ import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
 import KnowledgeLibrary from './pages/KnowledgeLibrary';
-import OnboardingTour from './components/ui/OnboardingTour';
+import Profile from './pages/Profile';
+import OnboardingTour from './components/ui/OnboardingTour'
+import WelcomeOverlay from './components/ui/WelcomeOverlay';
 
 export default function App() {
   const { theme, language, fontSize, highContrast, reducedMotion, readableFont, currentPage } = useUIStore();
@@ -103,12 +105,15 @@ export default function App() {
       <AppShell onShowAuth={() => setShowAuth(true)}>
         {currentPage === 'knowledge' ? (
           <KnowledgeLibrary />
+        ) : currentPage === 'profile' ? (
+          <Profile onShowAuth={() => setShowAuth(true)} />
         ) : (
           <Dashboard onShowAuth={() => setShowAuth(true)} />
         )}
       </AppShell>
 
-      {/* Onboarding tour always rendered (self-manages visibility) */}
+      {/* Welcome overlay (step 0) + spotlight tour (steps 1-5) */}
+      <WelcomeOverlay />
       <OnboardingTour />
     </div>
   );
