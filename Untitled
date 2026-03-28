@@ -1,0 +1,54 @@
+Act as a Senior Full-Stack Engineer and Fintech Expert. Build a premium financial forecasting application called "The Oracle" (האורקל). The app allows Israeli users to simulate their financial future over 30+ years, accounting for mortgages, inflation, and life events.
+
+### 1. PROJECT TECH STACK & CONFIG
+- Framework: React 18 (Vite), TypeScript.
+- Styling: Tailwind CSS (with Lucide-React icons).
+- Animations: Framer Motion (for fluid transitions and 60fps graph updates).
+- Charts: Recharts (AreaChart for Net Worth, PieChart for debt breakdown).
+- State: Zustand (Simulation Store) with LocalStorage persistence.
+- Backend/Auth: Supabase (Auth, DB for saved simulations).
+- i18n: i18next (Hebrew as DEFAULT/RTL, English as secondary).
+
+### 2. ISRAELI FINANCE ENGINE (src/lib/finance-engine.ts)
+Implement a robust calculation engine that handles:
+- Mortgage Tracks: 
+    * Prime: (BOI Rate + Margin).
+    * Fixed (Klova): Non-linked or Linked to CPI.
+    * CPI (Madad): Monthly principal adjustment based on annual inflation / 12.
+- Calculation Method: Spitzer Formula (Amortization).
+- Car Finance: Balloon loans with monthly interest-only payments and a final "bullet" payment.
+- Economic Variables: Adjustable global variables for 'Expected Annual Inflation' and 'Bank of Israel Rate'.
+
+### 3. PREMIERE UI/UX DESIGN (The "10 Designers" Look)
+- Theme: Dual-mode (Gold & Charcoal Dark / Crystal White Light).
+- Typography: 'Assistant' (Hebrew) and 'Montserrat' (English). High-contrast weights.
+- Micro-interactions:
+    * "Magnetic" buttons that subtly follow the cursor.
+    * "Liquid" transitions between dashboard views.
+    * Animated "Energy Bars" for budget health.
+- Responsiveness: Mobile-first. Desktop users get an expanded "Control Center" sidebar.
+
+### 4. FEATURES TO IMPLEMENT
+- Interactive Timeline: A draggable slider from Year 0 to Year 40.
+- Event System: Add "Life Events" (Buying a house, Child birth, Career jump) that instantly re-calculate the 30-year graph.
+- Auth System: Supabase Google Login & Magic Link.
+- Accessibility: A floating "Israel-standard" accessibility menu (font size, contrast, stop animations).
+- Legal: Fixed footer disclaimer in Hebrew regarding financial advice regulations in Israel.
+
+### 5. EXECUTION PLAN
+1. Setup File Structure:
+   /src
+     /components/[layout, charts, inputs, ui]
+     /lib/[finance-engine.ts, supabase.ts, i18n.ts]
+     /stores/[useSimulationStore.ts]
+     /pages/[Dashboard, Auth, Settings]
+2. Build the Finance Engine first with unit tests for accuracy (Spitzer, Prime, CPI).
+3. Implement the Main Dashboard with the 'Net Worth' AreaChart.
+4. Add the Sidebar with Israeli-specific financial sliders (Interest rates, Inflation, Monthly Savings).
+5. Setup Supabase Auth for saving scenarios.
+
+### 6. CONTENT & COPY (Hebrew Focus)
+- Marketing: "האם העתיד שלך בטוח? האורקל מחשב את המציאות הכלכלית שלך."
+- Tooltips: Explain complex terms like "ריבית צמודת מדד" and "לוח שפיצר" in simple language.
+
+BUILD THE COMPLETE APP NOW. START BY INITIALIZING THE VITE PROJECT AND INSTALLING DEPENDENCIES.
