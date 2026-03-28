@@ -1,76 +1,97 @@
-import { ReactNode, useEffect } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import Navigation from './Navigation';
-import Sidebar from './Sidebar';
-import LegalDisclaimer from '../ui/LegalDisclaimer';
-import AccessibilityMenu from '../ui/AccessibilityMenu';
+import { ReactNode, useEffect } from 'react'
+import { useUIStore } from '../../stores/useUIStore'
+import Navigation from './Navigation'
+import Sidebar from './Sidebar'
+import BottomSheet from '../ui/BottomSheet'
+import LegalDisclaimer from '../ui/LegalDisclaimer'
+import AccessibilityMenu from '../ui/AccessibilityMenu'
+import OnboardingTour from '../ui/OnboardingTour'
 
 interface AppShellProps {
-  children: ReactNode;
-  onShowAuth?: () => void;
+  children: ReactNode
+  onShowAuth?: () => void
 }
 
 export default function AppShell({ children, onShowAuth }: AppShellProps) {
-  const { fontSize, reducedMotion, readableFont, highContrast } = useUIStore();
+  const { fontSize, reducedMotion, readableFont, highContrast, sidebarOpen, toggleSidebar } = useUIStore()
 
+  // Apply accessibility font size
   useEffect(() => {
-    document.documentElement.style.fontSize = `${fontSize}px`;
-  }, [fontSize]);
+    document.documentElement.style.fontSize = `${fontSize}px`
+  }, [fontSize])
+
+  // BUG FIX: Reset mobile sheet state when resizing to desktop.
+  // Without this, sidebarOpen could remain true on desktop after a mobile open,
+  // causing the BottomSheet to be open on a screen where the sidebar is always visible.
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && sidebarOpen) {
+        toggleSidebar()
+      }
+    }
+    window.addEventListener('resize', handleResize, { passive: true })
+    return () => window.removeEventListener('resize', handleResize)
+  }, [sidebarOpen, toggleSidebar])
 
   return (
     <div
-      className={`
-        min-h-screen flex flex-col
-        ${reducedMotion ? 'reduce-motion' : ''}
-        ${readableFont ? 'readable-font' : ''}
-        ${highContrast ? 'high-contrast' : ''}
-      `}
+      className={[
+        'oracle-bg min-h-dvh flex flex-col',
+        reducedMotion ? 'reduce-motion' : '',
+        readableFont ? 'readable-font' : '',
+        highContrast ? 'high-contrast' : '',
+      ].join(' ')}
       style={{ paddingBottom: '40px' }}
     >
-      {/* Top Navigation */}
+      {/* Sticky navigation */}
       <Navigation onShowAuth={onShowAuth} />
 
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar (right in RTL) */}
-        <div className="hidden md:block">
+      {/* Layout: sidebar + main */}
+      <div className="flex flex-1 overflow-hidden relative z-10">
+        {/*
+          DESKTOP SIDEBAR — always visible on md+.
+          Uses CSS `hidden md:flex` — NOT controlled by JS sidebarOpen state.
+          This is the key fix for the resize bug: CSS controls visibility on desktop,
+          not the JS boolean that drives the mobile BottomSheet.
+        */}
+        <aside
+          className="hidden md:flex flex-shrink-0 flex-col overflow-y-auto border-l border-border-custom"
+          style={{
+            width: 'var(--sidebar-width)',
+            maxHeight: 'calc(100dvh - var(--nav-height) - 40px)',
+            background: 'var(--surface)',
+          }}
+        >
           <Sidebar />
-        </div>
+        </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 64px - 40px)' }}>
+        <main
+          className="flex-1 overflow-y-auto"
+          style={{ maxHeight: 'calc(100dvh - var(--nav-height) - 40px)' }}
+        >
           {children}
         </main>
       </div>
 
-      {/* Mobile sidebar overlay */}
-      <MobileSidebarOverlay />
+      {/*
+        MOBILE BOTTOM SHEET — only rendered on mobile.
+        sidebarOpen JS state only affects this component.
+        The md:hidden wrapper ensures the sheet never interferes on desktop.
+      */}
+      <div className="md:hidden">
+        <BottomSheet
+          isOpen={sidebarOpen}
+          onClose={toggleSidebar}
+          title="הגדרות סימולציה"
+        >
+          <Sidebar />
+        </BottomSheet>
+      </div>
 
-      {/* Accessibility menu */}
       <AccessibilityMenu />
-
-      {/* Legal footer */}
+      <OnboardingTour />
       <LegalDisclaimer />
     </div>
-  );
-}
-
-function MobileSidebarOverlay() {
-  const { sidebarOpen, toggleSidebar } = useUIStore();
-
-  if (!sidebarOpen) return null;
-
-  return (
-    <div className="md:hidden">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
-        onClick={toggleSidebar}
-      />
-      {/* Sidebar positioned fixed */}
-      <div className="fixed top-16 right-0 z-40 h-[calc(100vh-64px-40px)] overflow-y-auto w-80 bg-surface border-l border-border-custom">
-        <Sidebar />
-      </div>
-    </div>
-  );
+  )
 }

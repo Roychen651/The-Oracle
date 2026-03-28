@@ -54,191 +54,224 @@ export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {/* Hero / Empty state */}
-      {!hasConfig && <HeroSection />}
+    <div className="relative">
+      {/* Decorative orbs - purely visual, pointer-events none */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed top-0 left-0 w-full h-full overflow-hidden"
+        style={{ zIndex: 0 }}
+      >
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 600,
+            height: 600,
+            top: '-200px',
+            right: '-150px',
+            background: 'radial-gradient(circle, rgba(200,169,81,0.05) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 400,
+            height: 400,
+            bottom: '10%',
+            left: '-100px',
+            background: 'radial-gradient(circle, rgba(91,120,255,0.04) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+          }}
+        />
+      </div>
 
-      {/* Stats Row */}
-      {results && (
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-2 lg:grid-cols-4 gap-3"
-        >
-          <StatsCard
-            label={t('stats.netWorth')}
-            value={finalData?.netWorth ?? 0}
-            trend={finalData?.netWorth > 0 ? 'up' : 'down'}
-            color="gold"
-            delay={0}
-            subtitle={`בשנת ${params.years}`}
-          />
-          <StatsCard
-            label={t('stats.totalDebt')}
-            value={finalData?.totalDebt ?? 0}
-            trend={finalData?.totalDebt < (firstYearData?.totalDebt ?? 0) ? 'down' : 'neutral'}
-            color="red"
-            delay={0.08}
-            subtitle="חוב נוכחי"
-          />
-          <StatsCard
-            label={t('stats.cashFlow')}
-            value={firstYearData?.cashFlow ?? 0}
-            trend={
-              (firstYearData?.cashFlow ?? 0) > 0
-                ? 'up'
-                : (firstYearData?.cashFlow ?? 0) < 0
-                  ? 'down'
-                  : 'neutral'
-            }
-            color={(firstYearData?.cashFlow ?? 0) >= 0 ? 'green' : 'red'}
-            delay={0.16}
-            suffix="/ חודש"
-          />
-          <StatsCard
-            label={t('stats.debtFreeIn')}
-            value={results.debtFreeYear ?? params.years + 1}
-            prefix=""
-            suffix="שנה"
-            trend="neutral"
-            color="blue"
-            delay={0.24}
-            subtitle={
-              results.debtFreeYear
-                ? `עוד ${results.debtFreeYear - 1} שנים`
-                : 'לא במסגרת הסימולציה'
-            }
-          />
-        </motion.div>
-      )}
+      {/* Main content sits above orbs */}
+      <div className="relative z-10 p-4 sm:p-6 space-y-6">
+        {/* Hero / Empty state */}
+        {!hasConfig && <HeroSection />}
 
-      {/* Main Chart */}
-      {yearlyData.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-surface border border-border-custom rounded-2xl p-5"
-          data-tour="chart"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-text-primary font-assistant font-bold text-base">
-              {t('chart.title')}
-            </h2>
-            <div className="flex items-center gap-3 text-xs font-assistant">
-              <LegendDot color="#C8A951" label={t('chart.netWorth')} />
-              <LegendDot color="#FF4B5C" label={t('chart.totalDebt')} />
-              <LegendDot color="#34D4A8" label={t('chart.assets')} />
-            </div>
-          </div>
-
-          <MainGraph
-            data={yearlyData}
-            selectedYear={selectedYear}
-            onYearSelect={setSelectedYear}
-          />
-        </motion.div>
-      )}
-
-      {/* Bottom row: Pie + Summary */}
-      {results && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          {/* Pie breakdown */}
-          <div className="bg-surface border border-border-custom rounded-2xl p-5">
-            <h2 className="text-text-primary font-assistant font-bold text-base mb-4">
-              {t('breakdown.title')}
-            </h2>
-            <BreakdownPie
-              breakdown={results.monthlyBreakdown}
-              monthlyIncome={params.monthlyIncome}
+        {/* Stats Row */}
+        {results && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+          >
+            <StatsCard
+              label={t('stats.netWorth')}
+              value={finalData?.netWorth ?? 0}
+              trend={finalData?.netWorth > 0 ? 'up' : 'down'}
+              color="gold"
+              delay={0}
+              subtitle={`בשנת ${params.years}`}
             />
-          </div>
+            <StatsCard
+              label={t('stats.totalDebt')}
+              value={finalData?.totalDebt ?? 0}
+              trend={finalData?.totalDebt < (firstYearData?.totalDebt ?? 0) ? 'down' : 'neutral'}
+              color="red"
+              delay={0.08}
+              subtitle="חוב נוכחי"
+            />
+            <StatsCard
+              label={t('stats.cashFlow')}
+              value={firstYearData?.cashFlow ?? 0}
+              trend={
+                (firstYearData?.cashFlow ?? 0) > 0
+                  ? 'up'
+                  : (firstYearData?.cashFlow ?? 0) < 0
+                    ? 'down'
+                    : 'neutral'
+              }
+              color={(firstYearData?.cashFlow ?? 0) >= 0 ? 'green' : 'red'}
+              delay={0.16}
+              suffix="/ חודש"
+            />
+            <StatsCard
+              label={t('stats.debtFreeIn')}
+              value={results.debtFreeYear ?? params.years + 1}
+              prefix=""
+              suffix="שנה"
+              trend="neutral"
+              color="blue"
+              delay={0.24}
+              subtitle={
+                results.debtFreeYear
+                  ? `עוד ${results.debtFreeYear - 1} שנים`
+                  : 'לא במסגרת הסימולציה'
+              }
+            />
+          </motion.div>
+        )}
 
-          {/* Summary stats */}
-          <div className="bg-surface border border-border-custom rounded-2xl p-5">
-            <h2 className="text-text-primary font-assistant font-bold text-base mb-4">
-              סיכום פיננסי
-            </h2>
-            <div className="space-y-3">
-              <SummaryRow
-                label="שווי נטו סופי"
-                value={`₪${formatNumber(results.finalNetWorth)}`}
-                valueColor={results.finalNetWorth > 0 ? 'text-accent-green' : 'text-accent-red'}
+        {/* Main Chart */}
+        {yearlyData.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-surface border border-border-custom rounded-2xl p-5"
+            data-tour="chart"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-text-primary font-assistant font-bold text-base">
+                {t('chart.title')}
+              </h2>
+              <div className="flex items-center gap-3 text-xs font-assistant">
+                <LegendDot color="#C8A951" label={t('chart.netWorth')} />
+                <LegendDot color="#FF4B5C" label={t('chart.totalDebt')} />
+                <LegendDot color="#34D4A8" label={t('chart.assets')} />
+              </div>
+            </div>
+
+            <MainGraph
+              data={yearlyData}
+              selectedYear={selectedYear}
+              onYearSelect={setSelectedYear}
+            />
+          </motion.div>
+        )}
+
+        {/* Bottom row: Pie + Summary */}
+        {results && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
+            {/* Pie breakdown */}
+            <div className="bg-surface border border-border-custom rounded-2xl p-5">
+              <h2 className="text-text-primary font-assistant font-bold text-base mb-4">
+                {t('breakdown.title')}
+              </h2>
+              <BreakdownPie
+                breakdown={results.monthlyBreakdown}
+                monthlyIncome={params.monthlyIncome}
               />
-              <SummaryRow
-                label="סך ריבית ששולמה"
-                value={`₪${formatNumber(results.totalInterestPaid)}`}
-                valueColor="text-accent-red"
-              />
-              <SummaryRow
-                label="סך מס רווחי הון"
-                value={`₪${formatNumber(results.totalCapitalGainsTaxPaid)}`}
-                valueColor="text-accent-red"
-              />
-              {results.debtFreeYear && (
+            </div>
+
+            {/* Summary stats */}
+            <div className="bg-surface border border-border-custom rounded-2xl p-5">
+              <h2 className="text-text-primary font-assistant font-bold text-base mb-4">
+                סיכום פיננסי
+              </h2>
+              <div className="space-y-3">
                 <SummaryRow
-                  label="חופשי מחוב בשנת"
-                  value={`שנה ${results.debtFreeYear}`}
-                  valueColor="text-accent-green"
+                  label="שווי נטו סופי"
+                  value={`₪${formatNumber(results.finalNetWorth)}`}
+                  valueColor={results.finalNetWorth > 0 ? 'text-accent-green' : 'text-accent-red'}
                 />
-              )}
-              {results.breakEvenYear && (
                 <SummaryRow
-                  label="שווי נטו חיובי מאז"
-                  value={`שנה ${results.breakEvenYear}`}
-                  valueColor="text-gold"
+                  label="סך ריבית ששולמה"
+                  value={`₪${formatNumber(results.totalInterestPaid)}`}
+                  valueColor="text-accent-red"
                 />
-              )}
-              <div className="pt-2 border-t border-border-custom">
                 <SummaryRow
-                  label="תשלום משכנתא חודשי"
-                  value={`₪${formatNumber(results.monthlyBreakdown.mortgage)}`}
-                  valueColor="text-gold"
+                  label="סך מס רווחי הון"
+                  value={`₪${formatNumber(results.totalCapitalGainsTaxPaid)}`}
+                  valueColor="text-accent-red"
                 />
-                <div className="mt-2">
+                {results.debtFreeYear && (
                   <SummaryRow
-                    label="עומס על ההכנסה"
-                    value={`${
-                      params.monthlyIncome > 0
-                        ? (
-                            ((results.monthlyBreakdown.mortgage +
-                              results.monthlyBreakdown.car +
-                              results.monthlyBreakdown.expenses) /
-                              params.monthlyIncome) *
-                            100
-                          ).toFixed(0)
-                        : 0
-                    }%`}
-                    valueColor="text-text-secondary"
+                    label="חופשי מחוב בשנת"
+                    value={`שנה ${results.debtFreeYear}`}
+                    valueColor="text-accent-green"
                   />
+                )}
+                {results.breakEvenYear && (
+                  <SummaryRow
+                    label="שווי נטו חיובי מאז"
+                    value={`שנה ${results.breakEvenYear}`}
+                    valueColor="text-gold"
+                  />
+                )}
+                <div className="pt-2 border-t border-border-custom">
+                  <SummaryRow
+                    label="תשלום משכנתא חודשי"
+                    value={`₪${formatNumber(results.monthlyBreakdown.mortgage)}`}
+                    valueColor="text-gold"
+                  />
+                  <div className="mt-2">
+                    <SummaryRow
+                      label="עומס על ההכנסה"
+                      value={`${
+                        params.monthlyIncome > 0
+                          ? (
+                              ((results.monthlyBreakdown.mortgage +
+                                results.monthlyBreakdown.car +
+                                results.monthlyBreakdown.expenses) /
+                                params.monthlyIncome) *
+                              100
+                            ).toFixed(0)
+                          : 0
+                      }%`}
+                      valueColor="text-text-secondary"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
 
-      {/* Floating Save button for authenticated users */}
-      {user && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          onClick={handleSaveCloud}
-          disabled={saving}
-          className="fixed bottom-24 right-6 flex items-center gap-2 px-4 py-3 rounded-2xl font-assistant font-semibold text-sm shadow-gold transition-all disabled:opacity-60 z-30"
-          style={{ background: savedFeedback ? 'var(--accent-green)' : 'var(--gold)', color: 'var(--bg)' }}
-          aria-label="שמור תרחיש"
-        >
-          <Save size={16} />
-          {saving ? 'שומר...' : savedFeedback ? 'נשמר!' : 'שמור תרחיש'}
-        </motion.button>
-      )}
+        {/* Floating Save button for authenticated users */}
+        {user && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={handleSaveCloud}
+            disabled={saving}
+            className="fixed bottom-24 right-6 flex items-center gap-2 px-4 py-3 rounded-2xl font-assistant font-semibold text-sm shadow-gold transition-all disabled:opacity-60 z-30"
+            style={{ background: savedFeedback ? 'var(--accent-green)' : 'var(--gold)', color: 'var(--bg)' }}
+            aria-label="שמור תרחיש"
+          >
+            <Save size={16} />
+            {saving ? 'שומר...' : savedFeedback ? 'נשמר!' : 'שמור תרחיש'}
+          </motion.button>
+        )}
+      </div>
     </div>
   );
 }
