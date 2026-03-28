@@ -11,6 +11,7 @@ This file gives Claude Code full context on the project so every session starts 
 **Audience**: Israeli users planning their financial future (mortgages, savings, retirement)
 **Tone**: Professional, premium, slightly dramatic. Like Bloomberg Terminal meets a personal financial advisor. Never dumbed-down.
 **Language default**: Hebrew (RTL). English is secondary via a toggle.
+**Repo**: `github.com/Roychen651/The-Oracle`
 
 ---
 
@@ -22,7 +23,7 @@ This file gives Claude Code full context on the project so every session starts 
 | Styles | Tailwind CSS + CSS custom properties (`var(--gold)`, `var(--bg)`, etc.) |
 | Animations | Framer Motion — use `motion.*` components, `AnimatePresence` for mount/unmount |
 | Charts | Recharts — `AreaChart`, `PieChart`, `ResponsiveContainer` |
-| State | Zustand with `persist` middleware (LocalStorage key: `oracle-simulation`) |
+| State | Zustand with `persist` middleware (LocalStorage key: `oracle-simulation`, `oracle-ui`) |
 | i18n | i18next + react-i18next — always use `useTranslation()` hook, never hardcode Hebrew strings |
 | Icons | Lucide React — `import { IconName } from 'lucide-react'` |
 | Auth/DB | Supabase — gracefully degrades if env vars are missing |
@@ -39,34 +40,58 @@ src/
 │   └── supabase.ts         ← Client + DB helpers. Env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 │
 ├── stores/
-│   ├── useSimulationStore.ts  ← Financial params + computed results. Every setter calls recalculate().
-│   └── useUIStore.ts          ← Theme ('dark'|'light'), language ('he'|'en'), accessibility settings.
+│   ├── useSimulationStore.ts  ← Financial params + computed results + BOI warnings.
+│   ├── useUIStore.ts          ← Theme, language, accessibility, currentPage routing.
+│   └── useAuthStore.ts        ← Supabase session, sign in/out, initialization.
+│
+├── data/
+│   └── knowledge.ts        ← All knowledge library articles (KNOWLEDGE_BASE array).
 │
 ├── components/
 │   ├── layout/
-│   │   ├── AppShell.tsx    ← Root layout wrapper. Applies font-size + reduced-motion from UIStore.
-│   │   ├── Navigation.tsx  ← Top bar: Oracle logo, language/theme toggles, save button.
-│   │   └── Sidebar.tsx     ← Left sidebar (RTL: right side). 6 accordion sections.
+│   │   ├── AppShell.tsx    ← Root layout wrapper. Sidebar (desktop) + BottomSheet (mobile).
+│   │   ├── Navigation.tsx  ← Top bar: logo, knowledge toggle, language, theme, save, auth.
+│   │   └── Sidebar.tsx     ← RTL sidebar. 6 accordion sections of inputs.
 │   │
 │   ├── charts/
-│   │   ├── MainGraph.tsx   ← Primary AreaChart (Net Worth + Total Debt). Click to select year.
+│   │   ├── MainGraph.tsx   ← AreaChart (Net Worth + Debt + Assets). FIRE milestone markers.
 │   │   └── BreakdownPie.tsx ← Monthly budget donut chart.
 │   │
 │   ├── inputs/
-│   │   ├── SliderGroup.tsx    ← Reusable labeled slider with gold thumb.
-│   │   ├── MortgagePanel.tsx  ← Add/remove mortgage tracks (Prime, Fixed, CPI-Linked).
-│   │   └── LifeEventsPanel.tsx ← Add life events (child, house, retirement) to any year.
+│   │   ├── SliderGroup.tsx      ← Reusable labeled slider with gold thumb.
+│   │   ├── MortgagePanel.tsx    ← Add/remove mortgage tracks + BOI LTV/PTI warnings.
+│   │   └── LifeEventsPanel.tsx  ← Add life events (child, house, retirement) to any year.
 │   │
 │   └── ui/
-│       ├── StatsCard.tsx       ← Animated number counter card.
-│       ├── AccessibilityMenu.tsx ← Floating Israeli accessibility panel (WCAG 2.1 AA).
-│       ├── LegalDisclaimer.tsx ← Fixed-bottom Hebrew legal footer. NEVER remove or shorten.
-│       └── Modal.tsx           ← Generic modal with Framer Motion.
+│       ├── StatsCard.tsx         ← Animated number counter card.
+│       ├── AccessibilityMenu.tsx ← Floating accessibility panel (WCAG 2.1 AA). Fixed bottom-14 left-4.
+│       ├── LegalDisclaimer.tsx   ← Fixed-bottom Hebrew legal footer. NEVER remove or shorten.
+│       ├── Modal.tsx             ← Generic modal with Framer Motion.
+│       ├── BottomSheet.tsx       ← Draggable mobile bottom sheet (wraps Sidebar on mobile).
+│       ├── OnboardingTour.tsx    ← First-run guided tour (6 steps).
+│       ├── ActionPreview.tsx     ← Preview component for action confirmations.
+│       └── TooltipInfo.tsx       ← Info tooltip for financial jargon.
 │
 └── pages/
-    ├── Dashboard.tsx  ← Main page. Layout: Sidebar | Stats → Chart → Pie
-    └── Auth.tsx       ← Login/Register. Email+password, Google OAuth, Magic Link.
+    ├── Dashboard.tsx       ← Main simulator view. Stats → Chart → Pie → Summary → FIRE milestones.
+    ├── Auth.tsx            ← Login/Register/Forgot/Reset — all 4 auth views in one component.
+    └── KnowledgeLibrary.tsx ← Financial education library with search + category filter.
 ```
+
+---
+
+## Page Routing
+
+Navigation between pages is handled by `useUIStore.currentPage` (NOT React Router — no URL changes).
+
+```ts
+type AppPage = 'dashboard' | 'profile' | 'scenarios' | 'knowledge'
+```
+
+- `navigateTo('knowledge')` → renders `KnowledgeLibrary`
+- `navigateTo('dashboard')` → renders `Dashboard`
+- The `BookOpen` icon in `Navigation.tsx` toggles between dashboard and knowledge library.
+- `App.tsx` reads `currentPage` and switches the content rendered inside `AppShell`.
 
 ---
 
@@ -85,6 +110,7 @@ Always use these — never hardcode hex colors in components.
 --gold: #C8A951           (primary accent — brand color)
 --gold-light: #E8D48A     (hover states)
 --gold-glow: rgba(200,169,81,0.15)
+--gold-glow-strong: rgba(200,169,81,0.25)
 --text-primary: #F2EDE4
 --text-secondary: #8B84A2
 --text-muted: #4A4570
@@ -117,6 +143,9 @@ animate-slide-in, animate-fade-up, animate-pulse-gold
 .glass             — backdrop-blur surface (navigation bar)
 .energy-bar        — animated budget health bar
 .btn-magnetic      — base class for magnetic hover buttons
+.btn-primary       — gold filled button
+.btn-ghost         — transparent bordered button
+.oracle-bg         — main background gradient
 ```
 
 ---
@@ -125,42 +154,100 @@ animate-slide-in, animate-fade-up, animate-pulse-gold
 
 **File**: `src/lib/finance-engine.ts`
 
-This is the most sensitive file. Follow these rules:
+This is the most sensitive file. Follow these rules strictly:
 
-1. **Never change the Spitzer formula** — it's mathematically correct. The formula: `M = P * r * (1+r)^n / ((1+r)^n - 1)`
+### Month-by-Month Order of Operations (per tick)
+1. Apply annual inflation to expenses (start of each year, year > 1)
+2. Apply life events (start of their year, once)
+3. Apply macro/black swan shocks (portfolio shock one-time, income/expense/BOI delta for duration)
+4. Calculate mortgage payments (per track type)
+5. Calculate car payment
+6. Cash flow = income − expenses − debt payments
+7. Smart Tax Router: surplus → KH (tax-exempt, up to ₪1,660/month) → taxable assets
+8. Compound: KH at full return (0% CGT), taxable at net-of-CGT return
+9. Yearly snapshot + FIRE milestone detection
 
-2. **CPI-Linked track**: The balance increases EACH MONTH before recalculating payment:
+### Core Math Rules
+1. **Never change the Spitzer formula** — `M = P * r * (1+r)^n / ((1+r)^n - 1)`
+
+2. **CPI-Linked track**: Inflate balance FIRST, then recalculate payment:
    ```
    balance *= (1 + inflation / 100 / 12)  // inflate first
    payment = spitzer(balance, rate, remainingMonths)  // then recalculate
    ```
-   This is what makes Israeli צמוד מדד unique — payments grow over time.
 
-3. **Prime rate**: The effective rate is always `boiRate + track.margin`. If BOI changes in a simulation, recalculate.
+3. **Prime rate**: `effectiveRate = boiRate + track.margin`. Respects live BOI delta from macro events.
 
-4. **Car balloon**: The residual value is added to the LAST payment only, not spread monthly.
+4. **Car balloon**: Residual value added to the LAST payment only.
 
-5. **Investment return**: Applied monthly as `assets * (return/100/12)` on the running asset balance.
+5. **Investment return**: Applied monthly as `assets * (return/100/12)` with CGT deducted.
 
-6. **Life events**: Applied at the START of `event.year` (when `month % 12 === 1 && year === event.year`).
+6. **Keren Hishtalmut (KH)**: Tracked in a separate `khBalance`. No CGT on returns. Monthly cap: ₪1,660 (annual ₪19,920). `totalTaxSavedFromKH` is reported in results.
 
-7. **All amounts in ILS (₪)**. Display formatting: use `toLocaleString('he-IL')`.
+7. **Life events**: Applied at month 1 of `event.year` (first month of that year).
+
+8. **Macro events**: Portfolio shock is one-time at start month. Income/expense/BOI deltas persist for `durationMonths`.
+
+9. **All amounts in ILS (₪)**. Display: `toLocaleString('he-IL')`.
+
+### BOI Regulatory Validation
+`validateBOILimits(params)` enforces:
+- **LTV**: 75% max for first home, 50% for investors
+- **PTI (Payment-to-Income)**: must be < 40%
+
+Called in `useSimulationStore` on every param change when mortgages exist. Result stored as `boiWarnings` in the store.
+
+### FIRE Milestones
+5 milestone types detected per year:
+- `first_100k` — total assets ≥ ₪100,000
+- `net_positive` — net worth > 0
+- `debt_free` — total debt < ₪1,000 (only when mortgages exist)
+- `first_million` — total assets ≥ ₪1,000,000
+- `fire_crossover` — passive income (annual) ≥ annual expenses
+
+Milestones attach to `YearlyDataPoint.milestones[]` and appear as emoji markers on the chart.
 
 ---
 
 ## State Management Rules
 
 ### useSimulationStore
-- Every setter **must** call `get().recalculate()` at the end.
-- `recalculate()` calls `runSimulation(params)` from finance-engine and sets `results`.
-- Default params: income ₪15,000 | expenses ₪8,000 | assets ₪100,000 | no mortgage | BOI 4.5% | inflation 3.5% | return 7% | 30 years.
-- IDs for mortgage tracks and life events: use `Date.now().toString()` or `crypto.randomUUID()`.
+- Every setter calls `applyAndRecalculate()` internally — no manual `recalculate()` needed.
+- `applyAndRecalculate()` runs `runSimulation()` + `validateBOILimits()` + `set()` + debounced Supabase sync.
+- `boiWarnings: BOIValidationResult | null` — null when no mortgage tracks.
+- Default params: income ₪15,000 | expenses ₪8,000 | assets ₪100,000 | BOI 4.5% | inflation 3.5% | return 7% | 30 years | no mortgage | KH ₪0/month.
+- IDs for tracks/events: `generateId()` = `Date.now()-randomString`.
+
+New setters added:
+- `setKerenHishtalmutMonthly(v)` — KH monthly contribution
+- `setPropertyValue(v)` — property value for LTV check
+- `setPropertyOwner(owner)` — `'none' | 'first' | 'investor'`
+- `addMacroEvent(event)` / `removeMacroEvent(id)` — black swan events
 
 ### useUIStore
-- `theme` controls `data-theme` attribute on the root element (set in `App.tsx`).
-- `language` controls `i18n.changeLanguage()` and `document.documentElement.dir`.
-- `fontSize` (14–22px) is applied as inline style on `AppShell`.
-- `reducedMotion` adds `class="motion-reduce"` to root — Framer Motion components should check this.
+- `currentPage: AppPage` — drives page routing in `App.tsx`
+- `navigateTo(page)` — switches pages
+- `theme` controls `data-theme` on root element.
+- `language` controls `i18n.changeLanguage()` and `document.dir`.
+- `fontSize` (14–22px) applied to `document.documentElement.style.fontSize`.
+- `reducedMotion` adds `reduce-motion` class to body.
+- `onboardingStep` / `onboardingComplete` — first-run tour state.
+
+---
+
+## Knowledge Library
+
+**Data**: `src/data/knowledge.ts` — `KNOWLEDGE_BASE: KnowledgeArticle[]`
+
+Each article has:
+- `id`, `category`, `title`, `subtitle`, `icon`, `difficulty`, `readTime`, `tags`, `relatedIds`
+- `content: KnowledgeSection[]` — typed sections: `'intro' | 'explanation' | 'example' | 'warning' | 'tip' | 'formula'`
+
+Categories: `mortgage | investment | pension | tax | budget | car | insurance | realestate`
+
+The page (`KnowledgeLibrary.tsx`) has search + category chips + article cards + article modal.
+
+When adding new articles, add to `KNOWLEDGE_BASE` in `knowledge.ts` — no component changes needed.
 
 ---
 
@@ -169,7 +256,7 @@ This is the most sensitive file. Follow these rules:
 - All user-visible strings go through `useTranslation()` — `const { t } = useTranslation()`
 - Hebrew is the default (`lng: 'he'`). Strings look like: `t('mortgage.title')` → "משכנתא"
 - When adding a new feature, add its translation keys to BOTH `he` and `en` resources in `src/lib/i18n.ts` before wiring up the component.
-- Hebrew tooltips for financial jargon (Spitzer, Prime, CPI) exist under `tooltips.*` — use them in `<Tooltip>` components next to complex inputs.
+- Hebrew tooltips for financial jargon (Spitzer, Prime, CPI) exist under `tooltips.*` — use them in `<TooltipInfo>` components next to complex inputs.
 
 ---
 
@@ -178,19 +265,38 @@ This is the most sensitive file. Follow these rules:
 - The HTML `dir` attribute is set dynamically in `App.tsx` based on language.
 - Tailwind RTL variants: use `rtl:` prefix for direction-specific overrides.
 - The sidebar is on the "start" side — in RTL (Hebrew), it renders on the right. Use `start-0` not `left-0`.
-- For absolute positioning that should flip: use `inset-inline-start` and `inset-inline-end` CSS properties, or the `rtl:right-0 ltr:left-0` Tailwind pattern.
+- For absolute positioning: use `inset-inline-start` / `inset-inline-end`, or `rtl:right-0 ltr:left-0`.
 - Number formatting for Hebrew: `number.toLocaleString('he-IL')`.
-- Currency display: `₪` symbol always (not "NIS"). Place it BEFORE the number in Hebrew: `₪15,000`.
+- Currency: `₪` symbol always (not "NIS"). Place BEFORE the number: `₪15,000`.
+
+---
+
+## Fixed UI Elements & Z-Index Stack
+
+| Element | Position | z-index |
+|---|---|---|
+| Navigation | `sticky top-0` | 50 |
+| LegalDisclaimer | `fixed bottom-0` | 40 |
+| AccessibilityMenu FAB | `fixed bottom-14 left-4` | 50 |
+| BottomSheet (mobile) | `fixed inset-0` | 40 |
+| Onboarding overlay | `fixed inset-0` | 60 |
+| Article modal (KnowledgeLibrary) | `fixed inset-0` | 50 |
+
+**Important**: The accessibility FAB is at `bottom-14` to sit above the 40px `LegalDisclaimer`. Do not change this to `bottom-20` or higher — it previously overlapped page content.
+
+The floating save button was **removed** from Dashboard. Save is only in the Navigation bar (icon-only on mobile, full label on desktop).
 
 ---
 
 ## Supabase / Auth Notes
 
 - Env vars: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-- If env vars are missing/placeholder, `supabase.ts` gracefully returns null for auth and no-ops for DB calls.
-- Do NOT make auth a hard requirement for the simulation — the calculator works 100% offline.
-- Saved scenarios schema: `{ id, user_id, name, params: jsonb, created_at }`
-- Auth methods: Email+Password, Google OAuth, Magic Link.
+- If env vars are missing, `supabase.ts` gracefully returns null — all DB calls are no-ops.
+- The simulator works 100% offline without auth.
+- Auth views: Login | Register | Forgot Password | Reset Password (all in `Auth.tsx`)
+- Supabase auth events handled in `useAuthStore.initialize()` — detects `PASSWORD_RECOVERY` and sets URL param `reset=true`.
+- Simulation sync: debounced 1500ms after any param change, only when user is logged in.
+- DB schema migrations in `supabase/migrations/`.
 
 ---
 
@@ -203,12 +309,12 @@ Two workflows in `.github/workflows/`:
 | `ci.yml` | Every push to any branch | `tsc --noEmit` → `npm run build` |
 | `deploy.yml` | Push to `main` | Build → Deploy to GitHub Pages |
 
-**GitHub Pages setup** (one-time in repo settings):
+**GitHub Pages setup** (one-time):
 1. Settings → Pages → Source: **GitHub Actions**
-2. Add repository variable `VITE_BASE_PATH = /the-oracle/` (match your repo name)
-3. Add repository secrets: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+2. Add repo variable `VITE_BASE_PATH = /The-Oracle/`
+3. Add repo secrets: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 
-**Important**: The `vite.config.ts` reads `process.env.VITE_BASE_PATH` at build time. This allows the same codebase to deploy to GitHub Pages (`/the-oracle/`) or Vercel (`/`) without code changes.
+`vite.config.ts` reads `process.env.VITE_BASE_PATH` at build time — same code deploys to GitHub Pages or Vercel.
 
 ---
 
@@ -218,7 +324,8 @@ Two workflows in `.github/workflows/`:
 npm run dev      # dev server at localhost:5173
 npm run build    # production build to dist/
 npm run preview  # preview production build at localhost:4173
-npx tsc --noEmit # type-check only (no output files)
+npx tsc --noEmit # type-check only — run before every commit
+git push origin main  # triggers CI + deploy
 ```
 
 ---
@@ -227,20 +334,27 @@ npx tsc --noEmit # type-check only (no output files)
 
 | Decision | Reason |
 |---|---|
-| Hebrew RTL default | Target audience is Israeli. The product is fundamentally Hebrew-first. |
-| CSS custom properties over Tailwind dark: prefix | Allows instant theme switching at runtime without className juggling. Also cleaner in Recharts (chart colors read CSS vars). |
+| Hebrew RTL default | Target audience is Israeli. Product is fundamentally Hebrew-first. |
+| CSS custom properties over Tailwind dark: prefix | Instant runtime theme switching without className juggling. Recharts reads CSS vars for chart colors. |
 | Zustand over Redux | Simpler for this scope. The simulation store is the only complex state. |
 | Recharts over Chart.js / D3 | Best React integration, good TypeScript types, composable primitives. |
-| All calculation in browser | Privacy-first: user's financial data never leaves their device unless they explicitly save. |
-| Supabase graceful degradation | App is useful without an account. Auth is a "save your work" feature, not a gate. |
+| All calculation in browser | Privacy-first: user's financial data never leaves device unless explicitly saved. |
+| Supabase graceful degradation | App is fully usable without an account. Auth is a "save your work" feature, not a gate. |
+| UIStore page routing (no React Router) | Single-page app with no URL requirements. Avoids hash routing complexity for GitHub Pages. |
+| KH tracked separately from taxable assets | Tax law: Keren Hishtalmut returns are CGT-exempt. Mixing with taxable assets would overstate taxes. |
+| BOI validation as pure function | Can be called in store setters and UI without side effects. Returns structured result for granular warning display. |
 
 ---
 
 ## What NOT to Do
 
-- Don't hardcode any Hebrew strings in components — use `t()`.
+- Don't hardcode Hebrew strings in components — use `t()`.
 - Don't hardcode hex colors — use CSS custom properties.
-- Don't change the Spitzer formula or CPI math without verifying against a real amortization table.
-- Don't remove or abbreviate the legal disclaimer in `LegalDisclaimer.tsx` — it's legally required in Israel.
+- Don't change the Spitzer formula or CPI-linked math without verifying against a real amortization table.
+- Don't remove or abbreviate `LegalDisclaimer.tsx` — legally required under Israeli investment advisory law.
 - Don't make auth a blocker for using the simulator.
-- Don't add console.logs to the finance engine (it runs 360+ iterations per simulation).
+- Don't add `console.log` to the finance engine — it runs 360–480 iterations per simulation.
+- Don't move `AccessibilityMenu` above `bottom-14` — it will overlap content.
+- Don't add a floating save button in Dashboard — save lives in the nav bar only.
+- Don't use React Router — page routing uses `useUIStore.navigateTo()`.
+- Don't mix KH balance with taxable assets in calculations — they have different tax treatments.
