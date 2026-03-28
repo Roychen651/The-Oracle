@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type AppPage = 'dashboard' | 'profile' | 'scenarios' | 'knowledge'
+
 interface UIStore {
   theme: 'dark' | 'light';
   language: 'he' | 'en';
@@ -11,6 +13,7 @@ interface UIStore {
   sidebarOpen: boolean;
   onboardingComplete: boolean;
   onboardingStep: number; // 0-5, -1 = not started
+  currentPage: AppPage;
 
   toggleTheme: () => void;
   setLanguage: (lang: 'he' | 'en') => void;
@@ -25,6 +28,7 @@ interface UIStore {
   nextOnboardingStep: () => void;
   skipOnboarding: () => void;
   resetOnboarding: () => void;
+  navigateTo: (page: AppPage) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -39,6 +43,7 @@ export const useUIStore = create<UIStore>()(
       sidebarOpen: true,
       onboardingComplete: false,
       onboardingStep: -1,
+      currentPage: 'dashboard',
 
       toggleTheme: () => {
         set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' }));
@@ -102,6 +107,10 @@ export const useUIStore = create<UIStore>()(
 
       resetOnboarding: () => {
         set({ onboardingComplete: false, onboardingStep: -1 });
+      },
+
+      navigateTo: (page) => {
+        set({ currentPage: page });
       },
     }),
     {

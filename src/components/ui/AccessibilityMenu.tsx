@@ -30,7 +30,7 @@ export default function AccessibilityMenu() {
   } = useUIStore();
 
   return (
-    <div className="fixed bottom-20 left-4 z-50" dir="rtl">
+    <div className="fixed bottom-14 left-4 z-50" dir="rtl">
       <AnimatePresence>
         {isOpen && (
           <motion.div

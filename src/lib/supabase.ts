@@ -15,13 +15,146 @@ export interface AuthResult {
   error?: string | null
 }
 
+// ─── Profile ────────────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string
+  user_id: string
+  display_name: string | null
+  avatar_url: string | null
+  avatar_type: 'google' | 'preset' | 'upload'
+  avatar_preset_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function fetchProfile(userId: string): Promise<UserProfile | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error('Error fetching profile:', error)
+    return null
+  }
+  return data as UserProfile | null
+}
+
+export async function upsertProfile(
+  userId: string,
+  updates: Partial<UserProfile>
+): Promise<UserProfile | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(
+      { ...updates, user_id: userId, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    )
+    .select()
+    .single()
+  if (error) {
+    console.error('Error upserting profile:', error)
+    return null
+  }
+  return data as UserProfile
+}
+
+// ─── Scenarios ───────────────────────────────────────────────────────────────
+
 export interface SavedScenario {
   id: string
   user_id: string
   name: string
+  description: string | null
   params: SimulationParams
+  is_active: boolean
   created_at: string
+  updated_at: string
 }
+
+export async function fetchScenarios(userId: string): Promise<SavedScenario[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('scenarios')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.error('Error fetching scenarios:', error)
+    return []
+  }
+  return (data as SavedScenario[]) ?? []
+}
+
+export async function saveScenario(
+  userId: string,
+  name: string,
+  description: string,
+  params: SimulationParams
+): Promise<SavedScenario | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('scenarios')
+    .insert({
+      user_id: userId,
+      name,
+      description: description || null,
+      params,
+      is_active: false,
+    })
+    .select()
+    .single()
+  if (error) {
+    console.error('Error saving scenario:', error)
+    return null
+  }
+  return data as SavedScenario
+}
+
+export async function updateScenario(
+  id: string,
+  updates: Partial<SavedScenario>
+): Promise<SavedScenario | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('scenarios')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) {
+    console.error('Error updating scenario:', error)
+    return null
+  }
+  return data as SavedScenario
+}
+
+export async function deleteScenario(id: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('scenarios').delete().eq('id', id)
+  if (error) {
+    console.error('Error deleting scenario:', error)
+  }
+}
+
+export async function setActiveScenario(userId: string, scenarioId: string): Promise<void> {
+  if (!supabase) return
+  // Deactivate all user scenarios first
+  await supabase
+    .from('scenarios')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+  // Activate the selected one
+  await supabase
+    .from('scenarios')
+    .update({ is_active: true, updated_at: new Date().toISOString() })
+    .eq('id', scenarioId)
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
 
 export async function signInWithEmail(email: string, password: string): Promise<AuthResult> {
   if (!supabase) return { error: 'Supabase not configured' }
@@ -72,6 +205,8 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut()
 }
 
+// ─── Simulation State ────────────────────────────────────────────────────────
+
 export async function fetchSimulationState(userId: string): Promise<SimulationParams | null> {
   if (!supabase) return null
   const { data, error } = await supabase
@@ -90,57 +225,34 @@ export async function saveSimulationState(userId: string, state: SimulationParam
     .upsert({ user_id: userId, state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
 }
 
-export async function saveScenario(
-  name: string,
-  params: SimulationParams
-): Promise<SavedScenario | null> {
-  if (!supabase) {
-    console.warn('Supabase not configured. Cannot save scenario.')
-    return null
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    console.warn('User not authenticated.')
-    return null
-  }
-  const { data, error } = await supabase
-    .from('scenarios')
-    .insert({ user_id: user.id, name, params })
-    .select()
-    .single()
-  if (error) {
-    console.error('Error saving scenario:', error)
-    return null
-  }
-  return data as SavedScenario
-}
+// ─── Realtime ────────────────────────────────────────────────────────────────
 
-export async function loadScenarios(): Promise<SavedScenario[]> {
-  if (!supabase) return []
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return []
-  const { data, error } = await supabase
-    .from('scenarios')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-  if (error) {
-    console.error('Error loading scenarios:', error)
-    return []
-  }
-  return (data as SavedScenario[]) ?? []
-}
+export function subscribeToSimulation(
+  userId: string,
+  onUpdate: (params: SimulationParams) => void
+): () => void {
+  if (!supabase) return () => {}
 
-export async function deleteScenario(id: string): Promise<boolean> {
-  if (!supabase) return false
-  const { error } = await supabase.from('scenarios').delete().eq('id', id)
-  if (error) {
-    console.error('Error deleting scenario:', error)
-    return false
+  const channel = supabase
+    .channel('simulation-' + userId)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'simulations',
+        filter: 'user_id=eq.' + userId,
+      },
+      (payload) => {
+        const newState = (payload.new as { state: SimulationParams }).state
+        if (newState) {
+          onUpdate(newState)
+        }
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase!.removeChannel(channel)
   }
-  return true
 }

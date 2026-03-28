@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSimulationStore } from '../../stores/useSimulationStore'
-import { useUIStore } from '../../stores/useUIStore'
 import SliderGroup from '../inputs/SliderGroup'
 import MortgagePanel from '../inputs/MortgagePanel'
 import LifeEventsPanel from '../inputs/LifeEventsPanel'
@@ -257,180 +256,167 @@ export default function Sidebar() {
     updateEconomics,
     setSimulationYears,
   } = useSimulationStore()
-  const { sidebarOpen } = useUIStore()
 
   const mortgageCount = params.mortgageTracks.length
   const eventCount = params.events.length
 
   return (
-    <AnimatePresence>
-      {sidebarOpen && (
-        <motion.aside
-          initial={{ opacity: 0, x: 320 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 320 }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="w-80 shrink-0 bg-surface border-l border-border-custom overflow-y-auto h-full"
-          style={{ maxHeight: 'calc(100vh - 64px - 40px)' }}
-          aria-label="פאנל הגדרות"
-        >
-          {/* Budget Health Indicator */}
-          <BudgetHealth />
+    <div aria-label="פאנל הגדרות">
+      {/* Budget Health Indicator */}
+      <BudgetHealth />
 
-          {/* Income & Expenses */}
-          <Section
-            title={t('inputs.monthlyIncome')}
-            icon={<Wallet size={16} />}
-            defaultOpen={true}
-            dataTour="income"
-          >
-            <div className="space-y-4">
-              <SliderGroup
-                label={t('inputs.monthlyIncome')}
-                value={params.monthlyIncome}
-                min={3000}
-                max={100000}
-                step={500}
-                onChange={setMonthlyIncome}
-                showActionPreview={true}
-                previousValue={params.monthlyIncome}
-              />
-              <SliderGroup
-                label={t('inputs.monthlyExpenses')}
-                value={params.monthlyExpenses}
-                min={2000}
-                max={50000}
-                step={500}
-                onChange={setMonthlyExpenses}
-                showActionPreview={true}
-                previousValue={params.monthlyExpenses}
-              />
-              <SliderGroup
-                label={t('inputs.currentAssets')}
-                value={params.currentAssets}
-                min={0}
-                max={2000000}
-                step={10000}
-                onChange={setCurrentAssets}
-              />
-            </div>
-          </Section>
+      {/* Income & Expenses */}
+      <Section
+        title={t('inputs.monthlyIncome')}
+        icon={<Wallet size={16} />}
+        defaultOpen={true}
+        dataTour="income"
+      >
+        <div className="space-y-4">
+          <SliderGroup
+            label={t('inputs.monthlyIncome')}
+            value={params.monthlyIncome}
+            min={3000}
+            max={100000}
+            step={500}
+            onChange={setMonthlyIncome}
+            showActionPreview={true}
+            previousValue={params.monthlyIncome}
+          />
+          <SliderGroup
+            label={t('inputs.monthlyExpenses')}
+            value={params.monthlyExpenses}
+            min={2000}
+            max={50000}
+            step={500}
+            onChange={setMonthlyExpenses}
+            showActionPreview={true}
+            previousValue={params.monthlyExpenses}
+          />
+          <SliderGroup
+            label={t('inputs.currentAssets')}
+            value={params.currentAssets}
+            min={0}
+            max={2000000}
+            step={10000}
+            onChange={setCurrentAssets}
+          />
+        </div>
+      </Section>
 
-          {/* Mortgage */}
-          <Section
-            title={t('mortgage.title')}
-            icon={<Home size={16} />}
-            defaultOpen={mortgageCount > 0}
-            badge={mortgageCount > 0 ? String(mortgageCount) : undefined}
-            dataTour="mortgage"
-            titleExtra={
-              <TooltipInfo
-                term="לוח שפיצר"
-                explanation="לוח שפיצר הוא שיטת החזר משכנתא בה התשלום החודשי קבוע לאורך כל התקופה. בתחילה רוב התשלום הוא ריבית ובסוף רוב התשלום הוא קרן."
-                impact="שיטת ההחזר משפיעה על סך הריבית שתשלם לאורך חיי המשכנתא"
-              />
-            }
-          >
-            <MortgagePanel />
-          </Section>
+      {/* Mortgage */}
+      <Section
+        title={t('mortgage.title')}
+        icon={<Home size={16} />}
+        defaultOpen={mortgageCount > 0}
+        badge={mortgageCount > 0 ? String(mortgageCount) : undefined}
+        dataTour="mortgage"
+        titleExtra={
+          <TooltipInfo
+            term="לוח שפיצר"
+            explanation="לוח שפיצר הוא שיטת החזר משכנתא בה התשלום החודשי קבוע לאורך כל התקופה. בתחילה רוב התשלום הוא ריבית ובסוף רוב התשלום הוא קרן."
+            impact="שיטת ההחזר משפיעה על סך הריבית שתשלם לאורך חיי המשכנתא"
+          />
+        }
+      >
+        <MortgagePanel />
+      </Section>
 
-          {/* Car */}
-          <Section
-            title={t('car.title')}
-            icon={<Car size={16} />}
-            defaultOpen={params.carLoan !== null}
-            badge={params.carLoan ? '1' : undefined}
-          >
-            <CarLoanSection />
-          </Section>
+      {/* Car */}
+      <Section
+        title={t('car.title')}
+        icon={<Car size={16} />}
+        defaultOpen={params.carLoan !== null}
+        badge={params.carLoan ? '1' : undefined}
+      >
+        <CarLoanSection />
+      </Section>
 
-          {/* Economic Variables */}
-          <Section
-            title={t('economy.title')}
-            icon={<TrendingUp size={16} />}
-            defaultOpen={false}
-          >
-            <div className="space-y-4">
-              <SliderGroup
-                label={t('economy.boiRate')}
-                value={params.boiRate}
-                min={0.1}
-                max={10}
-                step={0.1}
-                formatter={(v) => `${v.toFixed(1)}%`}
-                onChange={(v) => updateEconomics({ boiRate: v })}
-                tooltip={t('tooltips.boiRate')}
-              />
-              <SliderGroup
-                label={t('economy.inflation')}
-                value={params.inflation}
-                min={0}
-                max={10}
-                step={0.1}
-                formatter={(v) => `${v.toFixed(1)}%`}
-                onChange={(v) => updateEconomics({ inflation: v })}
-              />
-              <SliderGroup
-                label={t('economy.investmentReturn')}
-                value={params.investmentReturn}
-                min={3}
-                max={20}
-                step={0.5}
-                formatter={(v) => `${v.toFixed(1)}%`}
-                onChange={(v) => updateEconomics({ investmentReturn: v })}
-              />
-              <SliderGroup
-                label="מס רווחי הון"
-                value={(params.capitalGainsTax ?? 0.25) * 100}
-                min={0}
-                max={50}
-                step={1}
-                formatter={(v) => `${v.toFixed(0)}%`}
-                onChange={(v) => {
-                  const store = useSimulationStore.getState()
-                  if (store.updateCapitalGainsTax) {
-                    store.updateCapitalGainsTax(v / 100)
-                  }
-                }}
-                tooltipInfo={{
-                  term: 'מס רווחי הון',
-                  explanation:
-                    'המס המוטל על רווחי השקעה בישראל. כיום עומד על 25% לרוב הנכסים הפיננסיים.',
-                  impact: 'מפחית את תשואת ההשקעה נטו בפועל',
-                }}
-              />
-            </div>
-          </Section>
+      {/* Economic Variables */}
+      <Section
+        title={t('economy.title')}
+        icon={<TrendingUp size={16} />}
+        defaultOpen={false}
+      >
+        <div className="space-y-4">
+          <SliderGroup
+            label={t('economy.boiRate')}
+            value={params.boiRate}
+            min={0.1}
+            max={10}
+            step={0.1}
+            formatter={(v) => `${v.toFixed(1)}%`}
+            onChange={(v) => updateEconomics({ boiRate: v })}
+            tooltip={t('tooltips.boiRate')}
+          />
+          <SliderGroup
+            label={t('economy.inflation')}
+            value={params.inflation}
+            min={0}
+            max={10}
+            step={0.1}
+            formatter={(v) => `${v.toFixed(1)}%`}
+            onChange={(v) => updateEconomics({ inflation: v })}
+          />
+          <SliderGroup
+            label={t('economy.investmentReturn')}
+            value={params.investmentReturn}
+            min={3}
+            max={20}
+            step={0.5}
+            formatter={(v) => `${v.toFixed(1)}%`}
+            onChange={(v) => updateEconomics({ investmentReturn: v })}
+          />
+          <SliderGroup
+            label="מס רווחי הון"
+            value={(params.capitalGainsTax ?? 0.25) * 100}
+            min={0}
+            max={50}
+            step={1}
+            formatter={(v) => `${v.toFixed(0)}%`}
+            onChange={(v) => {
+              const store = useSimulationStore.getState()
+              if (store.updateCapitalGainsTax) {
+                store.updateCapitalGainsTax(v / 100)
+              }
+            }}
+            tooltipInfo={{
+              term: 'מס רווחי הון',
+              explanation:
+                'המס המוטל על רווחי השקעה בישראל. כיום עומד על 25% לרוב הנכסים הפיננסיים.',
+              impact: 'מפחית את תשואת ההשקעה נטו בפועל',
+            }}
+          />
+        </div>
+      </Section>
 
-          {/* Life Events */}
-          <Section
-            title={t('events.title')}
-            icon={<Calendar size={16} />}
-            defaultOpen={eventCount > 0}
-            badge={eventCount > 0 ? String(eventCount) : undefined}
-            dataTour="events"
-          >
-            <LifeEventsPanel />
-          </Section>
+      {/* Life Events */}
+      <Section
+        title={t('events.title')}
+        icon={<Calendar size={16} />}
+        defaultOpen={eventCount > 0}
+        badge={eventCount > 0 ? String(eventCount) : undefined}
+        dataTour="events"
+      >
+        <LifeEventsPanel />
+      </Section>
 
-          {/* Simulation Period */}
-          <Section
-            title={t('inputs.simulationYears')}
-            icon={<Clock size={16} />}
-            defaultOpen={true}
-          >
-            <SliderGroup
-              label={t('inputs.simulationYears')}
-              value={params.years}
-              min={10}
-              max={40}
-              step={5}
-              formatter={(v) => `${v} ${t('inputs.years')}`}
-              onChange={setSimulationYears}
-            />
-          </Section>
-        </motion.aside>
-      )}
-    </AnimatePresence>
+      {/* Simulation Period */}
+      <Section
+        title={t('inputs.simulationYears')}
+        icon={<Clock size={16} />}
+        defaultOpen={true}
+      >
+        <SliderGroup
+          label={t('inputs.simulationYears')}
+          value={params.years}
+          min={10}
+          max={40}
+          step={5}
+          formatter={(v) => `${v} ${t('inputs.years')}`}
+          onChange={setSimulationYears}
+        />
+      </Section>
+    </div>
   )
 }

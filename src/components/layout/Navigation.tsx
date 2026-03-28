@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, Sun, Moon, Menu, Save, LogIn, LogOut } from 'lucide-react'
+import { Eye, Sun, Moon, Menu, Save, LogIn, LogOut, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import i18n from '../../lib/i18n'
 import { useUIStore } from '../../stores/useUIStore'
@@ -14,7 +14,7 @@ interface NavigationProps {
 
 export default function Navigation({ onShowAuth }: NavigationProps) {
   const { t } = useTranslation()
-  const { theme, language, toggleTheme, setLanguage, toggleSidebar } = useUIStore()
+  const { theme, language, toggleTheme, setLanguage, toggleSidebar, currentPage, navigateTo } = useUIStore()
   const { params } = useSimulationStore()
   const { user, signOut } = useAuthStore()
   const [saving, setSaving] = useState(false)
@@ -111,6 +111,24 @@ export default function Navigation({ onShowAuth }: NavigationProps) {
 
         {/* Right side: actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Knowledge Library toggle */}
+          <motion.button
+            onClick={() => navigateTo(currentPage === 'knowledge' ? 'dashboard' : 'knowledge')}
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.15 }}
+            className="btn-ghost flex items-center justify-center"
+            style={{
+              padding: 0,
+              minWidth: 44,
+              minHeight: 44,
+              color: currentPage === 'knowledge' ? 'var(--gold)' : 'var(--text-secondary)',
+            }}
+            aria-label="ספריית ידע"
+            title="ספריית ידע"
+          >
+            <BookOpen size={17} />
+          </motion.button>
+
           {/* Language toggle */}
           <button
             onClick={handleLanguageToggle}
@@ -160,16 +178,17 @@ export default function Navigation({ onShowAuth }: NavigationProps) {
           {/* Auth-dependent actions */}
           {user ? (
             <>
-              {/* Save to cloud — desktop only */}
+              {/* Save to cloud — full label on desktop, icon-only on mobile */}
               <button
                 onClick={handleSaveCloud}
                 disabled={saving}
-                className="btn-primary hidden sm:flex"
+                className="btn-primary flex"
                 style={{
                   background: savedFeedback ? 'var(--accent-green)' : 'var(--gold)',
                   color: 'var(--bg)',
                   padding: '8px 14px',
                   minHeight: 44,
+                  minWidth: 44,
                   fontSize: 13,
                   transition: 'background 0.3s ease',
                 }}
@@ -184,12 +203,15 @@ export default function Navigation({ onShowAuth }: NavigationProps) {
                     >
                       ✓
                     </motion.span>
-                    נשמר!
+                    <span className="hidden sm:inline">נשמר!</span>
                   </>
                 ) : (
                   <>
-                    <Save size={14} />
-                    {saving ? 'שומר...' : t('nav.saveScenario')}
+                    {saving
+                      ? <span className="inline-flex"><Save size={14} className="animate-pulse" /></span>
+                      : <Save size={14} />
+                    }
+                    <span className="hidden sm:inline">{saving ? 'שומר...' : t('nav.saveScenario')}</span>
                   </>
                 )}
               </button>

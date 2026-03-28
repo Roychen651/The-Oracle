@@ -4,10 +4,11 @@ import { useAuthStore } from './stores/useAuthStore';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
+import KnowledgeLibrary from './pages/KnowledgeLibrary';
 import OnboardingTour from './components/ui/OnboardingTour';
 
 export default function App() {
-  const { theme, language, fontSize, highContrast, reducedMotion, readableFont } = useUIStore();
+  const { theme, language, fontSize, highContrast, reducedMotion, readableFont, currentPage } = useUIStore();
   const [showAuth, setShowAuth] = useState(false);
 
   // Apply theme to document
@@ -100,7 +101,11 @@ export default function App() {
       }}
     >
       <AppShell onShowAuth={() => setShowAuth(true)}>
-        <Dashboard onShowAuth={() => setShowAuth(true)} />
+        {currentPage === 'knowledge' ? (
+          <KnowledgeLibrary />
+        ) : (
+          <Dashboard onShowAuth={() => setShowAuth(true)} />
+        )}
       </AppShell>
 
       {/* Onboarding tour always rendered (self-manages visibility) */}

@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, Sparkles, Shield, BarChart3, Save } from 'lucide-react';
+import { Eye, Sparkles, Shield, BarChart3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSimulationStore } from '../stores/useSimulationStore';
-import { useAuthStore } from '../stores/useAuthStore';
-import { saveSimulationState } from '../lib/supabase';
 import StatsCard from '../components/ui/StatsCard';
 import MainGraph from '../components/charts/MainGraph';
 import BreakdownPie from '../components/charts/BreakdownPie';
+import { FIRE_MILESTONE_LABELS, type FIREMilestone } from '../lib/finance-engine';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -26,11 +25,7 @@ interface DashboardProps {
 export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
   const { t } = useTranslation();
   const { params, results, recalculate, selectedYear, setSelectedYear } = useSimulationStore();
-  const { user } = useAuthStore();
-  const [saving, setSaving] = useState(false);
-  const [savedFeedback, setSavedFeedback] = useState(false);
 
-  // Run initial calculation on mount
   useEffect(() => {
     if (!results) {
       recalculate();
@@ -40,18 +35,13 @@ export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
   const hasConfig = params.mortgageTracks.length > 0 || params.carLoan !== null;
   const yearlyData = results?.yearlyData ?? [];
 
-  // Compute final stats
   const finalData = yearlyData[yearlyData.length - 1];
   const firstYearData = yearlyData[0];
 
-  const handleSaveCloud = async () => {
-    if (!user) return;
-    setSaving(true);
-    await saveSimulationState(user.id, params);
-    setSaving(false);
-    setSavedFeedback(true);
-    setTimeout(() => setSavedFeedback(false), 2000);
-  };
+  // Collect all FIRE milestones from all years for the timeline
+  const allMilestones: { year: number; milestone: FIREMilestone }[] = yearlyData.flatMap((d) =>
+    d.milestones.map((m) => ({ year: d.year, milestone: m }))
+  );
 
   return (
     <div className="relative">
@@ -203,16 +193,41 @@ export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
                   value={`₪${formatNumber(results.finalNetWorth)}`}
                   valueColor={results.finalNetWorth > 0 ? 'text-accent-green' : 'text-accent-red'}
                 />
+
+                {/* Money Burned — visceral interest cost */}
+                <div
+                  className="flex justify-between items-center py-2 px-3 rounded-xl"
+                  style={{ background: 'rgba(255,75,92,0.08)', border: '1px solid rgba(255,75,92,0.2)' }}
+                >
+                  <span className="text-sm font-assistant flex items-center gap-1.5" style={{ color: '#FF4B5C' }}>
+                    🔥 כסף שנשרף לפח
+                  </span>
+                  <span className="font-montserrat font-bold text-sm" style={{ color: '#FF4B5C' }}>
+                    ₪{formatNumber(results.totalInterestPaid)}
+                  </span>
+                </div>
+
                 <SummaryRow
-                  label="סך ריבית ששולמה"
-                  value={`₪${formatNumber(results.totalInterestPaid)}`}
-                  valueColor="text-accent-red"
-                />
-                <SummaryRow
-                  label="סך מס רווחי הון"
+                  label="מס רווחי הון"
                   value={`₪${formatNumber(results.totalCapitalGainsTaxPaid)}`}
                   valueColor="text-accent-red"
                 />
+
+                {/* KH tax savings — highlight if meaningful */}
+                {results.totalTaxSavedFromKH > 1000 && (
+                  <div
+                    className="flex justify-between items-center py-2 px-3 rounded-xl"
+                    style={{ background: 'rgba(52,212,168,0.08)', border: '1px solid rgba(52,212,168,0.2)' }}
+                  >
+                    <span className="text-sm font-assistant flex items-center gap-1.5" style={{ color: '#34D4A8' }}>
+                      🛡️ חיסכון מס — קרן השתלמות
+                    </span>
+                    <span className="font-montserrat font-bold text-sm" style={{ color: '#34D4A8' }}>
+                      +₪{formatNumber(results.totalTaxSavedFromKH)}
+                    </span>
+                  </div>
+                )}
+
                 {results.debtFreeYear && (
                   <SummaryRow
                     label="חופשי מחוב בשנת"
@@ -224,6 +239,13 @@ export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
                   <SummaryRow
                     label="שווי נטו חיובי מאז"
                     value={`שנה ${results.breakEvenYear}`}
+                    valueColor="text-gold"
+                  />
+                )}
+                {results.fireYear && (
+                  <SummaryRow
+                    label="🔥 עצמאות פיננסית (FIRE)"
+                    value={`שנה ${results.fireYear}`}
                     valueColor="text-gold"
                   />
                 )}
@@ -256,20 +278,45 @@ export default function Dashboard({ onShowAuth: _onShowAuth }: DashboardProps) {
           </motion.div>
         )}
 
-        {/* Floating Save button for authenticated users */}
-        {user && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={handleSaveCloud}
-            disabled={saving}
-            className="fixed bottom-24 right-6 flex items-center gap-2 px-4 py-3 rounded-2xl font-assistant font-semibold text-sm shadow-gold transition-all disabled:opacity-60 z-30"
-            style={{ background: savedFeedback ? 'var(--accent-green)' : 'var(--gold)', color: 'var(--bg)' }}
-            aria-label="שמור תרחיש"
+        {/* FIRE Milestones Timeline */}
+        {allMilestones.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-surface border border-border-custom rounded-2xl p-5"
           >
-            <Save size={16} />
-            {saving ? 'שומר...' : savedFeedback ? 'נשמר!' : 'שמור תרחיש'}
-          </motion.button>
+            <h2 className="text-text-primary font-assistant font-bold text-base mb-4">
+              🏆 אבני דרך פיננסיות
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {allMilestones.map(({ year, milestone }) => {
+                const cfg = FIRE_MILESTONE_LABELS[milestone];
+                return (
+                  <motion.div
+                    key={milestone}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(200,169,81,0.1), rgba(200,169,81,0.04))',
+                      border: '1px solid rgba(200,169,81,0.25)',
+                    }}
+                  >
+                    <span className="text-2xl">{cfg.icon}</span>
+                    <div>
+                      <p className="text-sm font-assistant font-semibold" style={{ color: 'var(--gold)' }}>
+                        {cfg.he}
+                      </p>
+                      <p className="text-xs font-assistant" style={{ color: 'var(--text-muted)' }}>
+                        שנה {year}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
         )}
       </div>
     </div>

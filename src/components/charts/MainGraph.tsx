@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import type { YearlyDataPoint } from '../../lib/finance-engine';
+import { FIRE_MILESTONE_LABELS } from '../../lib/finance-engine';
 
 interface MainGraphProps {
   data: YearlyDataPoint[];
@@ -85,6 +86,20 @@ export default function MainGraph({ data, selectedYear, onYearSelect }: MainGrap
   }
 
   const selectedData = data.find((d) => d.year === selectedYear);
+
+  // Collect milestone years for reference lines (deduplicate, keep first milestone per year)
+  const milestoneLines: Array<{ year: number; icon: string }> = [];
+  const seenMilestoneYears = new Set<number>();
+  for (const d of data) {
+    if (d.milestones.length > 0 && !seenMilestoneYears.has(d.year)) {
+      seenMilestoneYears.add(d.year);
+      const first = d.milestones[0];
+      milestoneLines.push({
+        year: d.year,
+        icon: FIRE_MILESTONE_LABELS[first].icon,
+      });
+    }
+  }
 
   return (
     <motion.div
@@ -198,6 +213,23 @@ export default function MainGraph({ data, selectedYear, onYearSelect }: MainGrap
               dot={false}
               activeDot={{ r: 5, fill: '#C8A951', stroke: 'var(--surface)', strokeWidth: 2 }}
             />
+
+            {/* FIRE milestone reference lines */}
+            {milestoneLines.map(({ year, icon }) => (
+              <ReferenceLine
+                key={year}
+                x={year}
+                stroke="rgba(200,169,81,0.45)"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                label={{
+                  value: icon,
+                  position: 'top',
+                  fontSize: 14,
+                  fill: 'var(--gold)',
+                }}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </div>

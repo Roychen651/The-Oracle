@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Home, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Home, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSimulationStore } from '../../stores/useSimulationStore';
 import type { MortgageTrack } from '../../lib/finance-engine';
@@ -25,14 +25,21 @@ function formatNumber(n: number): string {
 
 export default function MortgagePanel() {
   const { t } = useTranslation();
-  const { params, addMortgageTrack, updateMortgageTrack, removeMortgageTrack, results } =
-    useSimulationStore();
+  const {
+    params,
+    addMortgageTrack,
+    updateMortgageTrack,
+    removeMortgageTrack,
+    results,
+    boiWarnings,
+    setPropertyValue,
+    setPropertyOwner,
+  } = useSimulationStore();
   const { mortgageTracks } = params;
 
   const totalPrincipal = mortgageTracks.reduce((sum, t) => sum + t.principal, 0);
   const totalMonthlyPayment = results?.monthlyBreakdown.mortgage ?? 0;
 
-  // Budget health: what % of income goes to mortgage
   const mortgageLoadPct =
     params.monthlyIncome > 0
       ? Math.min(100, (totalMonthlyPayment / params.monthlyIncome) * 100)
@@ -45,8 +52,81 @@ export default function MortgagePanel() {
         ? 'bg-yellow-500'
         : 'bg-accent-green';
 
+  const hasViolations = boiWarnings && (boiWarnings.ltvViolation || boiWarnings.ptiViolation);
+
   return (
     <div className="space-y-4">
+      {/* BOI Regulatory Warnings */}
+      <AnimatePresence>
+        {hasViolations && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-xl p-3 space-y-1.5"
+            style={{
+              background: 'rgba(255,75,92,0.08)',
+              border: '1px solid rgba(255,75,92,0.35)',
+            }}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <ShieldAlert size={14} className="text-accent-red flex-shrink-0" />
+              <span className="text-xs font-bold font-assistant text-accent-red">
+                אזהרת בנק ישראל
+              </span>
+            </div>
+            {boiWarnings.warnings.map((w, i) => (
+              <p key={i} className="text-xs font-assistant" style={{ color: '#FF4B5C', lineHeight: 1.6 }}>
+                • {w}
+              </p>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Property Value for LTV */}
+      {mortgageTracks.length > 0 && (
+        <div className="bg-surface rounded-xl p-3 border border-border-custom space-y-2">
+          <p className="text-text-muted text-xs font-assistant font-semibold">בדיקת יחס מימון (LTV)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-text-muted text-xs font-assistant block mb-1">שווי הנכס</label>
+              <div className="relative">
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted text-xs pointer-events-none">₪</span>
+                <input
+                  type="number"
+                  value={params.propertyValue || ''}
+                  min={0}
+                  max={20000000}
+                  step={50000}
+                  placeholder="0"
+                  onChange={(e) => setPropertyValue(Number(e.target.value))}
+                  className="w-full bg-surface-elevated border border-border-custom rounded-lg py-1.5 text-xs font-montserrat text-text-primary text-center outline-none focus:border-gold transition-colors"
+                  style={{ paddingRight: '20px' }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-text-muted text-xs font-assistant block mb-1">סוג רכישה</label>
+              <select
+                value={params.propertyOwner}
+                onChange={(e) => setPropertyOwner(e.target.value as 'none' | 'first' | 'investor')}
+                className="w-full bg-surface-elevated border border-border-custom rounded-lg py-1.5 text-xs font-assistant text-text-primary outline-none focus:border-gold transition-colors text-center"
+              >
+                <option value="none">לא רלוונטי</option>
+                <option value="first">דירה ראשונה (75%)</option>
+                <option value="investor">משקיע (50%)</option>
+              </select>
+            </div>
+          </div>
+          {boiWarnings && params.propertyValue > 0 && !boiWarnings.ltvViolation && (
+            <p className="text-xs font-assistant" style={{ color: 'var(--accent-green)' }}>
+              ✓ יחס מימון {boiWarnings.ltvPercent.toFixed(0)}% — תקין
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Summary */}
       {mortgageTracks.length > 0 && (
         <div className="bg-surface rounded-xl p-3 border border-border-custom">
@@ -67,7 +147,7 @@ export default function MortgagePanel() {
             </span>
           </div>
 
-          {/* Budget health bar */}
+          {/* PTI health bar */}
           <div>
             <div className="flex justify-between items-center mb-1">
               <span className="text-text-muted text-xs font-assistant flex items-center gap-1">
