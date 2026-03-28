@@ -32,6 +32,7 @@ const defaultParams: SimulationParams = {
   kerenHishtalmutMonthly: 0,
   propertyValue: 0,
   propertyOwner: 'none',
+  equity: 0,
 };
 
 interface SimulationStore {
@@ -62,6 +63,7 @@ interface SimulationStore {
   setKerenHishtalmutMonthly: (v: number) => void;
   setPropertyValue: (v: number) => void;
   setPropertyOwner: (owner: SimulationParams['propertyOwner']) => void;
+  setEquity: (v: number) => void;
   recalculate: () => void;
   setSelectedYear: (year: number) => void;
   loadParams: (params: SimulationParams) => void;
@@ -219,6 +221,10 @@ export const useSimulationStore = create<SimulationStore>()(
         applyAndRecalculate(set, { ...get().params, propertyOwner: owner });
       },
 
+      setEquity: (v) => {
+        applyAndRecalculate(set, { ...get().params, equity: v });
+      },
+
       recalculate: () => {
         set({ isCalculating: true });
         const p = get().params;
@@ -241,6 +247,7 @@ export const useSimulationStore = create<SimulationStore>()(
           kerenHishtalmutMonthly: incoming.kerenHishtalmutMonthly ?? 0,
           propertyValue: incoming.propertyValue ?? 0,
           propertyOwner: incoming.propertyOwner ?? 'none',
+          equity: incoming.equity ?? 0,
         };
         const results = calculate(merged);
         const boiWarnings = merged.mortgageTracks.length > 0 ? validateBOILimits(merged) : null;

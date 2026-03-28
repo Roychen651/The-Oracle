@@ -121,6 +121,7 @@ export interface SimulationParams {
   // NEW: BOI LTV validation
   propertyValue: number;            // property value in ₪, for LTV calc, default 0
   propertyOwner: 'none' | 'first' | 'investor'; // first home = 75% LTV, investor = 50%
+  equity: number;                   // down payment / הון עצמי in ₪, UI metadata only
 }
 
 // ─── Simulation Results ──────────────────────────────────────────────────────
